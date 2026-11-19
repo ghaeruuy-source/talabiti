@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>طلبيتي</title>
+<meta name="description" content="تسوّق من شي ان الإمارات، وإحنا نوصلها لباب بيتك بالعراق.">
+<meta name="theme-color" content="#C2185B">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar"><div class="container"><b id="shopName">طلبيتي</b><span style="font-size:.82rem;opacity:.9">من شي ان الإمارات لباب بيتك</span></div></header>
+<main class="container" id="view" aria-live="polite"></main>
+<nav class="tabs" aria-label="أقسام الموقع">
+  <button type="button" data-tab="home">الرئيسية</button>
+  <button type="button" data-tab="add">أضف قطعة</button>
+  <button type="button" data-tab="cart">السلة<span class="badge" id="cartBadge" hidden></span></button>
+  <button type="button" data-tab="orders">طلباتي<span class="badge" id="ordBadge" hidden></span></button>
+</nav>
+<script src="config.js"></script>
+<script src="supabase.js"></script>
+<script>
+const cfg=window.TALABITI||{};
+const db=cfg.SUPABASE_URL?supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY):null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const iqd=n=>Math.round(+n||0).toLocaleString("en-US")+" د.ع";
+const aed=n=>(+n||0).toFixed(2)+" درهم";
+const STAGES=["انطلب من شي ان","بالطريق للعراق","وصل المخزن","بالتوصيل","تسلّم"];
+const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+let settings={shop_name:"طلبيتي",shein_url:"https://ar.shein.com/",whatsapp:""},coupons=[],orders=[];
+let cart=store.get("cart",[]),me=store.get("me",{name:"",phone:"",city:"",address:""}),codes=store.get("codes",[]);
+let tab="home",flash="",draft={};
+
+// رابط مشارك من تطبيق شي ان (أندرويد) أو ?link=
+const qp=new URLSearchParams(location.search);
+const shared=[qp.get("url"),qp.get("text"),qp.get("link")].filter(Boolean).join(" ");
+const m=shared.match(/https?:\/\/[^\s]*shein\.com[^\s]*/i);
+if(m){draft.link=m[0];tab="add";history.replaceState(null,"",location.pathname)}
+
+function bestCoupon(sale){return coupons.filter(c=>sale>=+c.min_aed).sort((a,b)=>b.pct-a.pct)[0]||null}
+function saveCart(){store.set("cart",cart)}
+function tabs(){
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===tab));
+  const cq=cart.reduce((a,c)=>a+c.qty,0);$("cartBadge").hidden=!cq;$("cartBadge").textContent=cq;
+  const need=orders.filter(o=>o.status==="quoted").length;$("ordBadge").hidden=!need;$("ordBadge").textContent=need;
+}
+function go(t){tab=t;render();scrollTo(0,0)}
+
+function render(){
+  tabs();const el=$("view");
+  const notice=!db?`<p class="err">الموقع بعده مو مربوط بقاعدة البيانات.</p>`:"";
+  if(tab==="home"){
+    el.innerHTML=`${notice}
+      <div class="hero"><h2>تسوّق من شي ان الإمارات، وإحنا نوصلها لباب بيتك</h2>
+        <p>كل الخصومات اللي تشوفها بشي ان تنحسبلك، وفوكاها كوبونات عروض اليوم.</p>
+        <a class="btn" href="${esc(settings.shein_url)}" target="_blank" rel="noopener">تسوّق من شي ان</a></div>
+      ${coupons.length?`<h3>عروض اليوم</h3>${coupons.map(c=>`<div class="coupon"><div><b>خصم ${+c.pct}%</b><p class="sub">${+c.min_aed?`على طلبك فوق ${+c.min_aed} درهم`:"على أي طلب"}</p></div><span class="pill new ltr">${esc(c.code)}</span></div>`).join("")}<p class="sub">ما تحتاج تكتب الكود، ينحسب وحده على طلبك.</p>`:""}
+      <div class="card"><h3>شلون تطلب</h3><ol class="howto">
+        <li>اضغط «تسوّق من شي ان» واختار اللي يعجبك</li>
+        <li>انسخ رابط القطعة من زر المشاركة، وارجع هنا لـ «أضف قطعة»</li>
+        <li>أرسل سلتك، ويوصلك السعر النهائي بالدينار. ما تدفع شي قبل ما توافق</li></ol></div>
+      <button class="btn ghost" type="button" id="goAdd">أضف قطعة للسلة</button>
+      ${settings.whatsapp?`<p class="sub" style="text-align:center">عندك سؤال؟ واتساب: <a class="ltr" href="https://wa.me/${esc(settings.whatsapp)}" target="_blank" rel="noopener">${esc(settings.whatsapp)}</a></p>`:""}`;
+    $("goAdd").onclick=()=>go("add");return;
+  }
+  if(tab==="add"){
+    el.innerHTML=`<h3>أضف قطعة من شي ان</h3>
+      <div class="field"><label for="dLink">رابط القطعة</label><input id="dLink" class="ltr" inputmode="url" placeholder="الصق الرابط هنا" value="${esc(draft.link)}"></div>
+      <div class="field"><label for="dName">شنو القطعة؟</label><input id="dName" value="${esc(draft.name)}" placeholder="مثلاً: فستان أسود"></div>
+      <div class="two">
+        <div class="field"><label for="dOrig">السعر الأصلي (درهم)</label><input id="dOrig" type="number" step="0.01" inputmode="decimal" value="${esc(draft.orig)}"></div>
+        <div class="field"><label for="dSale">بعد الخصم (درهم)</label><input id="dSale" type="number" step="0.01" inputmode="decimal" value="${esc(draft.sale)}" placeholder="إذا بيها خصم"></div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="dSize">القياس واللون</label><input id="dSize" value="${esc(draft.size)}" placeholder="M، أسود"></div>
+        <div class="field"><label for="dQty">العدد</label><input id="dQty" type="number" min="1" max="20" value="${esc(draft.qty||1)}"></div>
+      </div>
+      <p class="sub">اكتب السعر مثل ما تشوفه بشي ان. نتأكد منه قبل التسعير.</p>
+      <p class="err" id="err"></p>
+      <button class="btn" type="button" id="addCart">أضف للسلة</button>
+      <a class="btn ghost" href="${esc(settings.shein_url)}" target="_blank" rel="noopener">ارجع لشي ان</a>`;
+    $("addCart").onclick=()=>{
+      const it={link:$("dLink").value.trim(),name:$("dName").value.trim(),orig:+$("dOrig").value,sale:+$("dSale").value||+$("dOrig").value,size:$("dSize").value.trim()||"—",qty:Math.min(20,Math.max(1,+$("dQty").value||1))};
+      const lm=it.link.match(/https?:\/\/[^\s]*shein\.com[^\s]*/i);
+      if(!lm){$("err").textContent="الصق رابط القطعة من شي ان.";return}
+      it.link=lm[0];
+      if(!it.name||!(it.orig>0)){$("err").textContent="اكتب شنو القطعة وسعرها.";return}
+      if(it.sale>it.orig)it.sale=it.orig;
+      cart.push(it);saveCart();draft={};flash="انضافت للسلة ✓";go("cart");};
+    return;
+  }
+  if(tab==="cart"){
+    if(!cart.length){el.innerHTML=`<p class="empty">السلة فارغة. ارجع لشي ان واختار اللي يعجبك.</p><button class="btn ghost" type="button" id="goAdd">أضف قطعة</button>`;$("goAdd").onclick=()=>go("add");return}
+    const sale=cart.reduce((a,i)=>a+i.sale*i.qty,0),orig=cart.reduce((a,i)=>a+i.orig*i.qty,0),c=bestCoupon(sale);
+    const nextC=coupons.filter(x=>+x.min_aed>sale).sort((a,b)=>a.min_aed-b.min_aed)[0];
+    el.innerHTML=`${flash?`<div class="toast">${flash}</div>`:""}<h3>سلتك</h3>
+      ${cart.map((i,k)=>`<div class="line"><div class="h"><b>${esc(i.name)}</b><button type="button" data-k="${k}" aria-label="احذف">✕</button></div>
+        <p class="sub">${esc(i.size)} · العدد ${i.qty}</p>
+        <p class="num">${i.sale<i.orig?`<s>${aed(i.orig*i.qty)}</s> `:""}<b>${aed(i.sale*i.qty)}</b>${i.sale<i.orig?` <span class="save">-${Math.round((1-i.sale/i.orig)*100)}%</span>`:""}</p></div>`).join("")}
+      <div class="quote"><div class="q"><span>المجموع بشي ان</span><span class="num">${aed(sale)}</span></div>
+        ${c?`<div class="q d"><span>كوبون ${esc(c.code)} (${+c.pct}%)</span><span class="num">-${aed(sale*c.pct/100)}</span></div>`:""}
+        ${orig>sale||c?`<div class="saved">موفّر لحد هسه ${aed(orig-sale+(c?sale*c.pct/100:0))}</div>`:""}</div>
+      ${nextC?`<p class="sub">ضيف ${aed(nextC.min_aed-sale)} وتاخذ خصم ${+nextC.pct}% بكوبون ${esc(nextC.code)}.</p>`:""}
+      <div class="card"><h3>معلومات التوصيل</h3>
+        <div class="field"><label for="cName">الاسم</label><input id="cName" autocomplete="name" value="${esc(me.name)}"></div>
+        <div class="field"><label for="cPhone">رقم الموبايل</label><input id="cPhone" class="ltr" inputmode="tel" autocomplete="tel" placeholder="07xx xxx xxxx" value="${esc(me.phone)}"></div>
+        <div class="two"><div class="field"><label for="cCity">المحافظة</label><input id="cCity" value="${esc(me.city)}"></div>
+        <div class="field"><label for="cAddr">المنطقة / أقرب نقطة دالة</label><input id="cAddr" value="${esc(me.address)}"></div></div>
+        <div class="field"><label for="cNote">ملاحظة (اختياري)</label><input id="cNote"></div></div>
+      <p class="err" id="err"></p>
+      <button class="btn" type="button" id="send">أرسل طلبي</button>
+      <p class="sub">السعر النهائي بالدينار (ويّا الشحن والتوصيل) يوصلك بعد المراجعة.</p>`;
+    flash="";
+    el.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.k,1);saveCart();render()});
+    $("send").onclick=async()=>{
+      me={name:$("cName").value.trim(),phone:$("cPhone").value.trim(),city:$("cCity").value.trim(),address:$("cAddr").value.trim()};
+      if(me.name.length<2||!me.city){$("err").textContent="اكتب اسمك ومحافظتك.";return}
+      if(!/^(0?7\d{9}|9647\d{9})$/.test(me.phone.replace(/\D/g,""))){$("err").textContent="اكتب رقم موبايل عراقي صحيح، مثل 07701234567.";return}
+      if(!db){$("err").textContent="الموقع بعده مو مربوط، جرّب بعدين.";return}
+      store.set("me",me);$("send").disabled=true;$("send").textContent="دا يرسل…";
+      const {data,error}=await db.rpc("place_order",{p_name:me.name,p_phone:me.phone,p_city:me.city,p_address:me.address,p_note:$("cNote").value,p_items:cart});
+      if(error){$("err").textContent=error.message||"صار خطأ، جرّب مرة ثانية.";$("send").disabled=false;$("send").textContent="أرسل طلبي";return}
+      const row=Array.isArray(data)?data[0]:data;codes.push(row.code);store.set("codes",codes);
+      cart=[];saveCart();flash=`انرسل طلبك. رقم الطلب ${row.id}، ونرجعلك بالسعر قريباً.`;await loadOrders();go("orders");};
+    return;
+  }
+  // orders
+  el.innerHTML=`${flash?`<div class="toast">${flash}</div>`:""}${orders.length?orders.map(o=>{
+    const items=o.items.map(i=>`${esc(i.name)} (${esc(i.size)}) × ${i.qty}`).join("<br>");
+    if(o.status==="pending")return`<div class="card order"><div class="h"><b>طلب #${o.id}</b><span class="pill wait">بانتظار التسعير</span></div><p class="sub">${items}</p></div>`;
+    if(o.status==="rejected"||o.status==="cancelled")return`<div class="card order"><div class="h"><b>طلب #${o.id}</b><span class="pill off">${o.status==="rejected"?"مرفوض":"ملغي"}</span></div><p class="sub">${items}</p>${o.admin_note?`<p class="sub">${esc(o.admin_note)}</p>`:""}</div>`;
+    const itemDisc=(o.orig_aed-o.sale_aed)*(o.goods_iqd/((o.sale_aed*(1-(o.coupon_pct||0)/100))||1));
+    const box=`<div class="quote">
+      <div class="q"><span>السعر الأصلي</span><span class="num"><s>${iqd(+o.goods_iqd+ +o.saved_iqd)}</s></span></div>
+      ${+o.saved_iqd>0?`<div class="q d"><span>خصومات${o.coupon_code?` وكوبون ${esc(o.coupon_code)}`:""}</span><span class="num">-${iqd(o.saved_iqd)}</span></div>`:""}
+      <div class="q"><span>الشحن للعراق</span><span class="num">${iqd(o.ship_iqd)}</span></div>
+      <div class="q"><span>خدمة الطلب</span><span class="num">${iqd(o.comm_iqd)}</span></div>
+      <div class="q"><span>التوصيل</span><span class="num">${iqd(o.delivery_iqd)}</span></div>
+      <div class="q t"><span>المجموع</span><span class="num">${iqd(o.total_iqd)}</span></div></div>
+      ${+o.saved_iqd>0?`<div class="saved">وفّرت ${iqd(o.saved_iqd)} بالخصومات</div>`:""}${o.admin_note?`<p class="sub">${esc(o.admin_note)}</p>`:""}`;
+    if(o.status==="quoted")return`<div class="card order"><div class="h"><b>طلب #${o.id}</b><span class="pill new">وصل السعر</span></div><p class="sub">${items}</p>${box}
+      <button class="btn" type="button" data-acc="${esc(o.code)}">موافق، أريد أطلبه</button><p class="sub">بعد الموافقة نتواصل وياك لدفع العربون ${iqd(o.deposit_iqd)}.</p></div>`;
+    return`<div class="card order"><div class="h"><b>طلب #${o.id}</b><span class="num">${iqd(o.total_iqd)}</span></div><p class="sub">${items}</p>
+      <p class="sub">العربون: ${o.deposit_paid?"مدفوع ✓":`بانتظار الدفع (${iqd(o.deposit_iqd)})`}</p>
+      <ul class="track">${STAGES.map((s,i)=>`<li class="${o.deposit_paid&&i<=o.stage?"done":""}">${s}</li>`).join("")}</ul></div>`;
+  }).join(""):`<p class="empty">${codes.length?"دا نحمّل طلباتك…":"ماكو طلبات بعد."}</p>`}
+  ${codes.length?`<button class="btn ghost" type="button" id="refresh">حدّث</button>`:""}`;
+  flash="";
+  el.querySelectorAll("[data-acc]").forEach(b=>b.onclick=async()=>{b.disabled=true;
+    const {error}=await db.rpc("accept_order",{p_phone:me.phone,p_code:b.dataset.acc});
+    if(error){b.disabled=false;alertBox(error.message);return}
+    flash="تم. راح نتواصل وياك لدفع العربون.";await loadOrders();render();});
+  if($("refresh"))$("refresh").onclick=async()=>{await loadOrders();render()};
+}
+function alertBox(t){const p=document.createElement("p");p.className="err";p.textContent=t;$("view").prepend(p)}
+
+async function loadOrders(){
+  if(!db||!codes.length||!me.phone)return;
+  const {data}=await db.rpc("track_orders",{p_phone:me.phone,p_codes:codes});
+  if(data)orders=data;
+}
+async function boot(){
+  render();
+  if(!db)return;
+  const [s,c]=await Promise.all([db.from("settings").select("*").eq("id",1).single(),db.from("coupons").select("*").eq("active",true)]);
+  if(s.data){settings=s.data;$("shopName").textContent=settings.shop_name;document.title=settings.shop_name}
+  if(c.data)coupons=c.data;
+  await loadOrders();render();
+}
+document.querySelector("nav.tabs").onclick=async e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.tab==="orders")await loadOrders();go(b.dataset.tab)};
+boot();
+</script>
+</body>
+</html>

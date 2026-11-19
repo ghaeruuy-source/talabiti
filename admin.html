@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>لوحة طلبيتي</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media (max-width:700px){.kpis{grid-template-columns:1fr 1fr}}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi span{font-size:.8rem;color:var(--mute)}
+.kpi b{display:block;font:700 1.2rem var(--display)}
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:5px 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font:500 .85rem var(--body)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.ao{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:8px;background:var(--card)}
+.ao.pending{border-color:var(--warn)}
+.ao ul{margin:0;padding-inline-start:18px;font-size:.9rem}
+.ao a{color:var(--accent);font-size:.8rem}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.row .field{flex:1;min-width:110px}
+.citem{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;flex-wrap:wrap}
+.citem label{display:flex;gap:6px;align-items:center;font-size:.85rem}
+.citem input{width:auto}
+</style>
+</head>
+<body>
+<header class="bar"><div class="container wide"><b>لوحة طلبيتي</b><button class="btn sm ghost" type="button" id="logout" hidden>خروج</button></div></header>
+<main class="container wide" id="app"></main>
+<script src="config.js"></script>
+<script src="supabase.js"></script>
+<script>
+const cfg=window.TALABITI||{};
+const db=cfg.SUPABASE_URL?supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY):null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const iqd=n=>Math.round(+n||0).toLocaleString("en-US")+" د.ع";
+const aed=n=>(+n||0).toFixed(2)+" درهم";
+const STAGES=["انطلب من شي ان","بالطريق للعراق","وصل المخزن","بالتوصيل","تسلّم"];
+const ST={pending:"جديد، يحتاج تسعير",quoted:"انرسل السعر",accepted:"وافق الزبون",rejected:"مرفوض",cancelled:"ملغي"};
+let orders=[],coupons=[],settings=null,filter="open";
+
+function loginView(msg=""){
+  $("app").innerHTML=`<div class="card" style="max-width:420px;margin:40px auto"><h2>تسجيل دخول</h2>
+    <div class="field"><label for="em">الإيميل</label><input id="em" type="email" class="ltr" autocomplete="email"></div>
+    <div class="field"><label for="pw">كلمة السر</label><input id="pw" type="password" class="ltr" autocomplete="current-password"></div>
+    <p class="err" id="err">${esc(msg)}</p>
+    <button class="btn" type="button" id="in">دخول</button>
+    <button class="btn ghost" type="button" id="up">أول مرة؟ سوّي حساب</button></div>`;
+  $("in").onclick=async()=>{const {error}=await db.auth.signInWithPassword({email:$("em").value.trim(),password:$("pw").value});if(error)$("err").textContent="الإيميل أو كلمة السر غلط.";else boot()};
+  $("up").onclick=async()=>{const {error}=await db.auth.signUp({email:$("em").value.trim(),password:$("pw").value});$("err").textContent=error?error.message:"انسوى الحساب. خلي المطوّر يفعّله كمدير، بعدها سجل دخول.";};
+}
+async function load(){
+  const [o,c,s]=await Promise.all([db.from("orders").select("*").order("created_at",{ascending:false}).limit(300),db.from("coupons").select("*").order("created_at"),db.from("settings").select("*").eq("id",1).single()]);
+  orders=o.data||[];coupons=c.data||[];settings=s.data;
+}
+function view(){
+  let pend=0,sales=0,profit=0,saved=0;
+  orders.forEach(o=>{if(o.status==="pending")pend++;if(o.status==="accepted"){sales+=+o.total_iqd;profit+=+o.comm_iqd;saved+=+o.saved_iqd}});
+  const list=orders.filter(o=>filter==="all"||(filter==="open"?["pending","quoted"].includes(o.status)||(o.status==="accepted"&&o.stage<4):o.status===filter));
+  $("app").innerHTML=`
+    <div class="kpis">
+      <div class="kpi"><span>بانتظار التسعير</span><b class="num">${pend}</b></div>
+      <div class="kpi"><span>مبيعات مأكدة</span><b class="num">${iqd(sales)}</b></div>
+      <div class="kpi"><span>ربح العمولة</span><b class="num">${iqd(profit)}</b></div>
+      <div class="kpi"><span>وفّرنا للزباين</span><b class="num">${iqd(saved)}</b></div></div>
+    <div class="grid">
+      <section style="display:grid;gap:12px;min-width:0">
+        <div class="row" style="justify-content:space-between"><h3>الطلبات</h3><button class="btn sm ghost" type="button" id="reload">حدّث</button></div>
+        <div class="filters">${[["open","المفتوحة"],["pending","تحتاج تسعير"],["quoted","بانتظار الزبون"],["accepted","مأكدة"],["all","الكل"]].map(([k,l])=>`<button type="button" class="chip" aria-pressed="${filter===k}" data-f="${k}">${l}</button>`).join("")}</div>
+        ${list.length?list.map(card).join(""):`<p class="empty">ماكو طلبات هنا.</p>`}
+      </section>
+      <aside style="display:grid;gap:12px;min-width:0">
+        <div class="card"><h3>عروض اليوم</h3><p class="sub">الفعّالة تطلع للزبون وتنحسب بالتسعير.</p>
+          ${coupons.map(c=>`<div class="citem"><span><b class="ltr">${esc(c.code)}</b> · ${+c.pct}% ${+c.min_aed?`فوق ${+c.min_aed} درهم`:"على أي طلب"}</span><span style="display:flex;gap:8px"><label><input type="checkbox" data-on="${c.id}"${c.active?" checked":""}> فعّال</label><button class="btn sm ghost" type="button" data-del="${c.id}">احذف</button></span></div>`).join("")}
+          <div class="row"><div class="field"><label for="nCode">الكود</label><input id="nCode" class="ltr"></div><div class="field"><label for="nPct">الخصم ٪</label><input id="nPct" type="number" value="20"></div><div class="field"><label for="nMin">فوق (درهم)</label><input id="nMin" type="number" value="0"></div></div>
+          <button class="btn sm" type="button" id="addC">أضف كوبون</button></div>
+        <div class="card"><h3>الإعدادات</h3>
+          <div class="field"><label for="sName">اسم الصفحة</label><input id="sName" value="${esc(settings?.shop_name)}"></div>
+          <div class="field"><label for="sWa">واتساب (9647xxxxxxxxx)</label><input id="sWa" class="ltr" value="${esc(settings?.whatsapp)}"></div>
+          <div class="field"><label for="sUrl">رابط شي ان</label><input id="sUrl" class="ltr" value="${esc(settings?.shein_url)}"></div>
+          <div class="row">
+            <div class="field"><label for="sRate">الدرهم (دينار)</label><input id="sRate" type="number" value="${+settings?.rate_aed}"></div>
+            <div class="field"><label for="sShip">الشحن/كيلو</label><input id="sShip" type="number" value="${+settings?.ship_per_kg}"></div></div>
+          <div class="row">
+            <div class="field"><label for="sComm">العمولة ٪</label><input id="sComm" type="number" value="${+settings?.commission_pct}"></div>
+            <div class="field"><label for="sDel">التوصيل</label><input id="sDel" type="number" value="${+settings?.delivery}"></div>
+            <div class="field"><label for="sDep">العربون ٪</label><input id="sDep" type="number" value="${+settings?.deposit_pct}"></div></div>
+          <p class="sub" id="sMsg"></p>
+          <button class="btn sm" type="button" id="saveS">احفظ</button></div>
+      </aside></div>`;
+  bind();
+}
+function card(o){
+  const items=o.items.map(i=>`<li>${esc(i.name)} · ${esc(i.size)} × ${i.qty} · ${i.sale<i.orig?`<s>${aed(i.orig)}</s> `:""}${aed(i.sale)}<br><a class="ltr" href="${esc(i.link)}" target="_blank" rel="noopener">${esc(i.link)}</a></li>`).join("");
+  let body="";
+  if(o.status==="pending"){
+    const qty=o.items.reduce((a,i)=>a+ +i.qty,0);
+    body=`<div class="row"><div class="field"><label for="sa${o.id}">المجموع بعد خصم شي ان (درهم)</label><input id="sa${o.id}" type="number" step="0.01" value="${(+o.sale_aed).toFixed(2)}"></div>
+      <div class="field"><label for="k${o.id}">الوزن (كغم)</label><input id="k${o.id}" type="number" step="0.05" value="${(qty*0.35).toFixed(2)}"></div>
+      <button class="btn sm" type="button" data-q="${o.id}">ثبّت السعر</button><button class="btn sm ghost" type="button" data-rej="${o.id}">ارفض</button></div>`;
+  }else if(o.status==="quoted"||o.status==="accepted"){
+    body=`<p class="sub">المجموع <b class="num">${iqd(o.total_iqd)}</b> · ربحك <b class="num">${iqd(o.comm_iqd)}</b> · العربون ${iqd(o.deposit_iqd)}${o.coupon_code?` · استعمل كوبون <b class="ltr">${esc(o.coupon_code)}</b> بالشراء`:""}</p>`;
+    if(o.status==="accepted")body+=`<div class="row"><label class="sub" style="display:flex;gap:6px;align-items:center"><input type="checkbox" style="width:auto" data-paid="${o.id}"${o.deposit_paid?" checked":""}> استلمت العربون</label>
+      <select style="width:auto" aria-label="حالة الطلب" data-st="${o.id}">${STAGES.map((s,i)=>`<option value="${i}"${i===o.stage?" selected":""}>${s}</option>`).join("")}</select></div>`;
+  }
+  const tel=o.phone.replace(/^0/,"964");
+  return`<div class="ao${o.status==="pending"?" pending":""}"><div class="row" style="justify-content:space-between"><b>#${o.id} · ${esc(o.customer_name)}</b><span class="pill ${o.status==="pending"?"wait":o.status==="accepted"?"ok":o.status==="quoted"?"new":"off"}">${ST[o.status]}</span></div>
+    <p class="sub">${esc(o.city)}${o.address?` · ${esc(o.address)}`:""} · <a class="ltr" href="https://wa.me/${esc(tel)}" target="_blank" rel="noopener">${esc(o.phone)}</a> · ${new Date(o.created_at).toLocaleString("ar-IQ")}</p>
+    ${o.note?`<p class="sub">ملاحظة: ${esc(o.note)}</p>`:""}<ul>${items}</ul>${body}</div>`;
+}
+function bind(){
+  const A=$("app");
+  A.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filter=b.dataset.f;view()});
+  $("reload").onclick=async()=>{await load();view()};
+  A.querySelectorAll("[data-q]").forEach(b=>b.onclick=async()=>{const id=+b.dataset.q;b.disabled=true;
+    const {error}=await db.rpc("quote_order",{p_id:id,p_kg:+$("k"+id).value||0,p_sale_aed:+$("sa"+id).value||null});
+    if(error){alert(error.message)}await load();view();});
+  A.querySelectorAll("[data-rej]").forEach(b=>b.onclick=async()=>{await db.from("orders").update({status:"rejected"}).eq("id",+b.dataset.rej);await load();view()});
+  A.querySelectorAll("[data-paid]").forEach(x=>x.onchange=async()=>{await db.from("orders").update({deposit_paid:x.checked}).eq("id",+x.dataset.paid);await load();view()});
+  A.querySelectorAll("[data-st]").forEach(x=>x.onchange=async()=>{await db.from("orders").update({stage:+x.value}).eq("id",+x.dataset.st);await load();view()});
+  A.querySelectorAll("[data-on]").forEach(x=>x.onchange=async()=>{await db.from("coupons").update({active:x.checked}).eq("id",+x.dataset.on);await load();view()});
+  A.querySelectorAll("[data-del]").forEach(x=>x.onclick=async()=>{await db.from("coupons").delete().eq("id",+x.dataset.del);await load();view()});
+  $("addC").onclick=async()=>{const code=$("nCode").value.trim().toUpperCase();if(!code)return;await db.from("coupons").insert({code,pct:+$("nPct").value,min_aed:+$("nMin").value||0});await load();view()};
+  $("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,""),shein_url:$("sUrl").value.trim(),rate_aed:+$("sRate").value,ship_per_kg:+$("sShip").value,commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
+}
+async function boot(){
+  if(!db){$("app").innerHTML=`<p class="err">الموقع بعده مو مربوط بقاعدة البيانات.</p>`;return}
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){$("logout").hidden=true;loginView();return}
+  const {data:adm}=await db.from("admins").select("user_id").eq("user_id",session.user.id).maybeSingle();
+  if(!adm){loginView("هذا الحساب مو مفعّل كمدير بعد.");return}
+  $("logout").hidden=false;$("logout").onclick=async()=>{await db.auth.signOut();boot()};
+  await load();view();
+  db.channel("orders").on("postgres_changes",{event:"*",schema:"public",table:"orders"},async()=>{await load();view()}).subscribe();
+}
+boot();
+</script>
+</body>
+</html>
