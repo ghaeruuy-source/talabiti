@@ -182,6 +182,7 @@ function render(){
       <button class="btn" type="button" data-acc="${esc(o.code)}">موافق، أريد أطلبه</button><p class="sub">بعد الموافقة نتواصل وياك لدفع العربون ${iqd(o.deposit_iqd)}.</p></div>`;
     return`<div class="card order"><div class="h"><b>طلب #${o.id}</b><span class="num">${iqd(o.total_iqd)}</span></div><p class="sub">${items}</p>
       <p class="sub">العربون: ${o.deposit_paid?"مدفوع ✓":`بانتظار الدفع (${iqd(o.deposit_iqd)})`}</p>
+      ${o.eta&&o.stage<4?`<p class="sub">📦 يوصلك تقريباً: <b>${new Date(o.eta+"T12:00").toLocaleDateString("ar-IQ",{weekday:"long",day:"numeric",month:"long"})}</b></p>`:""}
       <ul class="track">${STAGES.map((s,i)=>`<li class="${o.deposit_paid&&i<=o.stage?"done":""}">${s}</li>`).join("")}</ul></div>`;
   }).join(""):`<p class="empty">${codes.length?"دا نحمّل طلباتك…":"ماكو طلبات بعد."}</p>`}
   ${codes.length?`<button class="btn ghost" type="button" id="refresh">حدّث</button>`:""}`;

@@ -108,7 +108,8 @@ function card(o){
   }else if(o.status==="quoted"||o.status==="accepted"){
     body=`<p class="sub">المجموع <b class="num">${iqd(o.total_iqd)}</b> · ربحك <b class="num">${iqd(o.comm_iqd)}</b> · العربون ${iqd(o.deposit_iqd)}${o.coupon_code?` · استعمل كوبون <b class="ltr">${esc(o.coupon_code)}</b> بالشراء`:""}</p>`;
     if(o.status==="accepted")body+=`<div class="row"><label class="sub" style="display:flex;gap:6px;align-items:center"><input type="checkbox" style="width:auto" data-paid="${o.id}"${o.deposit_paid?" checked":""}> استلمت العربون</label>
-      <select style="width:auto" aria-label="حالة الطلب" data-st="${o.id}">${STAGES.map((s,i)=>`<option value="${i}"${i===o.stage?" selected":""}>${s}</option>`).join("")}</select></div>`;
+      <select style="width:auto" aria-label="حالة الطلب" data-st="${o.id}">${STAGES.map((s,i)=>`<option value="${i}"${i===o.stage?" selected":""}>${s}</option>`).join("")}</select>
+      <label class="sub" style="display:flex;gap:6px;align-items:center">يوصل تقريباً <input type="date" style="width:auto" data-eta="${o.id}" value="${o.eta||""}"></label></div>`;
   }
   const tel=o.phone.replace(/^0/,"964");
   return`<div class="ao${o.status==="pending"?" pending":""}"><div class="row" style="justify-content:space-between"><b>#${o.id} · ${esc(o.customer_name)}</b><span class="pill ${o.status==="pending"?"wait":o.status==="accepted"?"ok":o.status==="quoted"?"new":"off"}">${ST[o.status]}</span></div>
@@ -130,6 +131,7 @@ function bind(){
     if(error){alert(error.message)}await load();view();});
   A.querySelectorAll("[data-rej]").forEach(b=>b.onclick=async()=>{await db.from("orders").update({status:"rejected"}).eq("id",+b.dataset.rej);await load();view()});
   A.querySelectorAll("[data-paid]").forEach(x=>x.onchange=async()=>{await db.from("orders").update({deposit_paid:x.checked}).eq("id",+x.dataset.paid);await load();view()});
+  A.querySelectorAll("[data-eta]").forEach(x=>x.onchange=async()=>{await db.from("orders").update({eta:x.value||null}).eq("id",+x.dataset.eta);await load();view()});
   A.querySelectorAll("[data-st]").forEach(x=>x.onchange=async()=>{await db.from("orders").update({stage:+x.value}).eq("id",+x.dataset.st);await load();view()});
   A.querySelectorAll("[data-on]").forEach(x=>x.onchange=async()=>{await db.from("coupons").update({active:x.checked}).eq("id",+x.dataset.on);await load();view()});
   A.querySelectorAll("[data-del]").forEach(x=>x.onclick=async()=>{await db.from("coupons").delete().eq("id",+x.dataset.del);await load();view()});

@@ -171,3 +171,6 @@ grant execute on function public.quote_order to authenticated;
 do $$ begin
   alter publication supabase_realtime add table public.orders;
 exception when others then null; end $$;
+
+-- موعد الوصول المتوقع
+alter table public.orders add column if not exists eta date;
