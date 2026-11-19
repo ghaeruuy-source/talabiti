@@ -8,30 +8,59 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="style.css">
 <style>
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-@media (max-width:700px){.kpis{grid-template-columns:1fr 1fr}}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+body{font-size:16px}
+.page{max-width:920px}
+.top{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:5px}
+.top button{flex:1;padding:10px;border:0;border-radius:10px;background:none;font:600 .95rem var(--display);color:var(--mute);cursor:pointer;position:relative}
+.top button[aria-current="true"]{background:var(--accent);color:var(--accent-fg)}
+.top .dot{background:var(--deal);color:#fff;font-size:.72rem;border-radius:9px;padding:0 6px;margin-inline-start:6px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
 .kpi span{font-size:.8rem;color:var(--mute)}
-.kpi b{display:block;font:700 1.2rem var(--display)}
-.grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start}
-@media (max-width:900px){.grid{grid-template-columns:1fr}}
-.filters{display:flex;gap:6px;flex-wrap:wrap}
-.chip{padding:5px 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font:500 .85rem var(--body)}
+.kpi b{display:block;font:700 1.25rem var(--display)}
+.kpi.hi{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}.kpi.hi span{color:inherit;opacity:.85}
+@media (max-width:560px){.kpis{grid-template-columns:1fr 1fr}.kpis .kpi:first-child{grid-column:1/-1}}
+.filters{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.chip{padding:6px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font:500 .88rem var(--body);white-space:nowrap}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
-.ao{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:8px;background:var(--card)}
-.ao.pending{border-color:var(--warn)}
-.ao ul{margin:0;padding-inline-start:18px;font-size:.9rem}
-.ao a{color:var(--accent);font-size:.8rem}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
-.row .field{flex:1;min-width:110px}
-.citem{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;flex-wrap:wrap}
-.citem label{display:flex;gap:6px;align-items:center;font-size:.85rem}
+.ao{border:1px solid var(--line);border-radius:16px;background:var(--card);overflow:hidden}
+.ao.pending{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn)}
+.ao-h{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.ao-h b{font:700 1.05rem var(--display)}
+.ao-c{display:flex;flex-wrap:wrap;gap:6px 14px;padding:10px 16px;font-size:.88rem;color:var(--mute);border-bottom:1px solid var(--line)}
+.wa{display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#fff!important;text-decoration:none;border-radius:999px;padding:1px 10px;font-weight:600;font-size:.82rem}
+.ao-i{padding:12px 16px;display:grid;gap:8px;border-bottom:1px solid var(--line)}
+.it{display:flex;gap:10px;align-items:center}
+.it img{width:52px;height:52px;object-fit:cover;border-radius:10px;flex:none;background:var(--bg)}
+.it .t{flex:1;min-width:0;font-size:.92rem}
+.it .t a{color:var(--accent);font-size:.8rem}
+.basket{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--soft);border-radius:12px;padding:10px 12px;flex-wrap:wrap}
+.basket a.btn{width:auto;color:var(--accent-fg)}
+.ao-a{padding:12px 16px;display:grid;gap:10px;background:color-mix(in srgb,var(--bg) 55%,var(--card))}
+.ao-a h4{margin:0;font:600 .9rem var(--display);color:var(--mute)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.row .field{flex:1;min-width:130px}
+.pv{background:var(--card);border:1.5px dashed var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:2px}
+.pv .big{font:700 1.3rem var(--display);color:var(--accent)}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.sum div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:.8rem;color:var(--mute)}
+.sum b{display:block;color:var(--ink);font:700 1rem var(--display)}
+.sum .me b{color:var(--ok)}
+.steps{display:flex;gap:4px;flex-wrap:wrap}
+.steps button{flex:1;min-width:90px;padding:8px 6px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);font:500 .8rem var(--body);color:var(--mute);cursor:pointer}
+.steps button.done{background:color-mix(in srgb,var(--ok) 14%,var(--card));border-color:var(--ok);color:var(--ok);font-weight:700}
+.tog{display:flex;gap:8px;align-items:center;font-size:.9rem;cursor:pointer}
+.tog input{width:20px;height:20px;accent-color:var(--ok)}
+.citem{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;flex-wrap:wrap}
+.citem b{font:700 1rem var(--display)}
+.citem label{display:flex;gap:6px;align-items:center;font-size:.88rem}
 .citem input{width:auto}
+.hint{font-size:.8rem;color:var(--mute)}
 </style>
 </head>
 <body>
-<header class="bar"><div class="container wide"><b>لوحة طلبيتي</b><button class="btn sm ghost" type="button" id="logout" hidden>خروج</button></div></header>
-<main class="container wide" id="app"></main>
+<header class="bar"><div class="container page"><b>لوحة طلبيتي</b><button class="btn sm ghost" type="button" id="logout" hidden>خروج</button></div></header>
+<main class="container page" id="app"></main>
 <script src="config.js"></script>
 <script src="supabase.js"></script>
 <script>
@@ -43,7 +72,7 @@ const iqd=n=>Math.round(+n||0).toLocaleString("en-US")+" د.ع";
 const aed=n=>(+n||0).toFixed(2)+" درهم";
 const STAGES=["انطلب من شي ان","بالطريق للعراق","وصل المخزن","بالتوصيل","تسلّم"];
 const ST={pending:"جديد، يحتاج تسعير",quoted:"انرسل السعر",accepted:"وافق الزبون",rejected:"مرفوض",cancelled:"ملغي"};
-let orders=[],coupons=[],settings=null,filter="open";
+let orders=[],coupons=[],settings=null,filter="open",tab="orders";
 
 function loginView(msg=""){
   $("app").innerHTML=`<div class="card" style="max-width:420px;margin:40px auto"><h2>تسجيل دخول</h2>
@@ -60,83 +89,87 @@ async function load(){
   orders=o.data||[];coupons=c.data||[];settings=s.data;
 }
 function view(){
-  let pend=0,sales=0,profit=0,saved=0;
-  orders.forEach(o=>{if(o.status==="pending")pend++;if(o.status==="accepted"){sales+=+o.total_iqd;profit+=+o.comm_iqd;saved+=+o.saved_iqd}});
-  const list=orders.filter(o=>filter==="all"||(filter==="open"?["pending","quoted"].includes(o.status)||(o.status==="accepted"&&o.stage<4):o.status===filter));
-  $("app").innerHTML=`
+  let pend=0,sales=0,profit=0;
+  orders.forEach(o=>{if(o.status==="pending")pend++;if(o.status==="accepted"){sales+=+o.total_iqd;profit+=+o.comm_iqd}});
+  const list=orders.filter(o=>filter==="all"||(filter==="open"?["pending","quoted"].includes(o.status)||(o.status==="accepted"&&o.stage<4):filter==="done"?o.status==="accepted"&&o.stage>=4:o.status===filter));
+  const T=[["orders","الطلبات",pend],["coupons","العروض",0],["settings","الإعدادات",0]];
+  let body="";
+  if(tab==="orders")body=`
     <div class="kpis">
-      <div class="kpi"><span>بانتظار التسعير</span><b class="num">${pend}</b></div>
+      <div class="kpi hi"><span>ربحك</span><b class="num">${iqd(profit)}</b></div>
       <div class="kpi"><span>مبيعات مأكدة</span><b class="num">${iqd(sales)}</b></div>
-      <div class="kpi"><span>ربح العمولة</span><b class="num">${iqd(profit)}</b></div>
-      <div class="kpi"><span>وفّرنا للزباين</span><b class="num">${iqd(saved)}</b></div></div>
-    <div class="grid">
-      <section style="display:grid;gap:12px;min-width:0">
-        <div class="row" style="justify-content:space-between"><h3>الطلبات</h3><button class="btn sm ghost" type="button" id="reload">حدّث</button></div>
-        <div class="filters">${[["open","المفتوحة"],["pending","تحتاج تسعير"],["quoted","بانتظار الزبون"],["accepted","مأكدة"],["all","الكل"]].map(([k,l])=>`<button type="button" class="chip" aria-pressed="${filter===k}" data-f="${k}">${l}</button>`).join("")}</div>
-        ${list.length?list.map(card).join(""):`<p class="empty">ماكو طلبات هنا.</p>`}
-      </section>
-      <aside style="display:grid;gap:12px;min-width:0">
-        <div class="card"><h3>عروض اليوم</h3><p class="sub">الفعّالة تطلع للزبون وتنحسب بالتسعير.</p>
-          ${coupons.map(c=>`<div class="citem"><span><b class="ltr">${esc(c.code)}</b> · ${+c.pct}% ${+c.min_aed?`فوق ${+c.min_aed} درهم`:"على أي طلب"}</span><span style="display:flex;gap:8px"><label><input type="checkbox" data-on="${c.id}"${c.active?" checked":""}> فعّال</label><button class="btn sm ghost" type="button" data-del="${c.id}">احذف</button></span></div>`).join("")}
-          <div class="row"><div class="field"><label for="nCode">الكود</label><input id="nCode" class="ltr"></div><div class="field"><label for="nPct">الخصم ٪</label><input id="nPct" type="number" value="20"></div><div class="field"><label for="nMin">فوق (درهم)</label><input id="nMin" type="number" value="0"></div></div>
-          <button class="btn sm" type="button" id="addC">أضف كوبون</button></div>
-        <div class="card"><h3>الإعدادات</h3>
-          <div class="field"><label for="sName">اسم الصفحة</label><input id="sName" value="${esc(settings?.shop_name)}"></div>
-          <div class="field"><label for="sWa">واتساب (9647xxxxxxxxx)</label><input id="sWa" class="ltr" value="${esc(settings?.whatsapp)}"></div>
-          <div class="field"><label for="sUrl">رابط شي ان</label><input id="sUrl" class="ltr" value="${esc(settings?.shein_url)}"></div>
-          <div class="row">
-            <div class="field"><label for="sRate">الدرهم (دينار)</label><input id="sRate" type="number" value="${+settings?.rate_aed}"></div>
-            <div class="field"><label for="sShip">الشحن/كيلو</label><input id="sShip" type="number" value="${+settings?.ship_per_kg}"></div></div>
-          <div class="row">
-            <div class="field"><label for="sComm">العمولة ٪</label><input id="sComm" type="number" value="${+settings?.commission_pct}"></div>
-            <div class="field"><label for="sDel">التوصيل</label><input id="sDel" type="number" value="${+settings?.delivery}"></div>
-            <div class="field"><label for="sDep">العربون ٪</label><input id="sDep" type="number" value="${+settings?.deposit_pct}"></div></div>
-          <p class="sub" id="sMsg"></p>
-          <button class="btn sm" type="button" id="saveS">احفظ</button></div>
-      </aside></div>`;
+      <div class="kpi"><span>تحتاج تسعير</span><b class="num">${pend}</b></div></div>
+    <div class="filters">${[["open","المفتوحة"],["pending","تحتاج تسعير"],["quoted","بانتظار الزبون"],["accepted","مأكدة"],["done","تسلّمت"],["all","الكل"]].map(([k,l])=>`<button type="button" class="chip" aria-pressed="${filter===k}" data-f="${k}">${l}</button>`).join("")}</div>
+    ${list.length?list.map(card).join(""):`<p class="empty">ماكو طلبات هنا.</p>`}`;
+  else if(tab==="coupons")body=`<div class="card"><h3>عروض اليوم</h3><p class="hint">الكوبونات الفعّالة تطلع للزبون بالموقع، وأحسن كوبون ينحسب وحده بالتسعير. استعمل نفس الكود بشي ان من تشتري.</p>
+      ${coupons.length?coupons.map(c=>`<div class="citem"><span><b class="ltr">${esc(c.code)}</b> · خصم ${+c.pct}% ${+c.min_aed?`· فوق ${+c.min_aed} درهم`:"· على أي طلب"}</span><span style="display:flex;gap:10px;align-items:center"><label><input type="checkbox" data-on="${c.id}"${c.active?" checked":""}> فعّال</label><button class="btn sm ghost" type="button" data-del="${c.id}">احذف</button></span></div>`).join(""):`<p class="hint">ماكو كوبونات بعد.</p>`}
+      <h3 style="margin-top:8px">كوبون جديد</h3>
+      <div class="row"><div class="field"><label for="nCode">الكود (مثل ما بشي ان)</label><input id="nCode" class="ltr"></div><div class="field"><label for="nPct">الخصم ٪</label><input id="nPct" type="number" value="20"></div><div class="field"><label for="nMin">إذا الطلب فوق (درهم)</label><input id="nMin" type="number" value="0"></div></div>
+      <button class="btn" type="button" id="addC">أضف الكوبون</button></div>`;
+  else body=`<div class="card"><h3>الأسعار</h3>
+      <div class="row">
+        <div class="field"><label for="sRate">سعر الصرف: الدرهم بكم دينار؟</label><input id="sRate" type="number" value="${+settings?.rate_aed}"></div>
+        <div class="field"><label for="sComm">ربحك (عمولة ٪)</label><input id="sComm" type="number" value="${+settings?.commission_pct}"></div></div>
+      <div class="row">
+        <div class="field"><label for="sShip">الشحن لكل كيلو (دينار)</label><input id="sShip" type="number" value="${+settings?.ship_per_kg}"></div>
+        <div class="field"><label for="sDel">التوصيل (دينار)</label><input id="sDel" type="number" value="${+settings?.delivery}"></div>
+        <div class="field"><label for="sDep">العربون ٪</label><input id="sDep" type="number" value="${+settings?.deposit_pct}"></div></div>
+      <h3 style="margin-top:8px">الصفحة</h3>
+      <div class="field"><label for="sName">اسم الصفحة</label><input id="sName" value="${esc(settings?.shop_name)}"></div>
+      <div class="field"><label for="sWa">رقم الواتساب</label><input id="sWa" class="ltr" value="${esc(settings?.whatsapp)}"></div>
+      <div class="field"><label for="sUrl">رابط شي ان</label><input id="sUrl" class="ltr" value="${esc(settings?.shein_url)}"></div>
+      <p class="sub" id="sMsg"></p>
+      <button class="btn" type="button" id="saveS">احفظ</button></div>`;
+  $("app").innerHTML=`<div class="top">${T.map(([k,l,n])=>`<button type="button" data-tab="${k}" aria-current="${tab===k}">${l}${n?`<span class="dot">${n}</span>`:""}</button>`).join("")}</div>${body}`;
   bind();
 }
 function card(o){
-  const items=o.items.map(i=>`<li>${i.img?`<img src="${esc(i.img)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;vertical-align:middle;margin-inline-end:8px">`:""}${i.basket?`<b>${esc(i.name)}</b><br><a class="btn" style="margin-top:6px;color:#fff;font-size:1rem" href="${esc(i.link)}" target="_blank" rel="noopener">🛍️ افتح سلة الزبون بشي ان</a><br><span class="sub">شوف المجموع بعد الخصم واكتبه تحت بالتسعير.</span>`:`${esc(i.name)} · ${esc(i.size)} × ${i.qty} · ${i.sale<i.orig?`<s>${aed(i.orig)}</s> `:""}${aed(i.sale)}<br><a class="ltr" href="${esc(i.link)}" target="_blank" rel="noopener">${esc(i.link)}</a>`}</li>`).join("");
-  let body="";
+  const items=o.items.map(i=>i.basket
+    ?`<div class="basket"><span><b>🛍️ ${esc(i.name)}</b><br><span class="hint">افتح السلة، شوف المجموع بعد الخصم واكتبه تحت.</span></span><a class="btn sm" href="${esc(i.link)}" target="_blank" rel="noopener">افتح السلة</a></div>`
+    :`<div class="it">${i.img?`<img src="${esc(i.img)}" alt="">`:""}<div class="t"><b>${esc(i.name)}</b><br><span class="hint">القياس: ${esc(i.size)} · العدد: ${i.qty}${+i.orig>0?` · السعر: <bdi>${(+i.sale).toFixed(2)}</bdi> درهم${i.sale<i.orig?` (كان <s><bdi>${(+i.orig).toFixed(2)}</bdi></s>)`:""}`:""}</span><br><a href="${esc(i.link)}" target="_blank" rel="noopener">افتح القطعة بشي ان ↗</a></div></div>`).join("");
+  let act="";
   if(o.status==="pending"){
-    const qty=o.items.reduce((a,i)=>a+ +i.qty,0);
-    body=`<div class="row"><div class="field"><label for="sa${o.id}">المجموع بعد خصم شي ان (درهم)</label><input id="sa${o.id}" type="number" step="0.01" value="${+o.sale_aed?(+o.sale_aed).toFixed(2):""}" placeholder="من سلة الزبون"></div>
-      <div class="field"><label for="k${o.id}">الوزن (كغم)</label><input id="k${o.id}" type="number" step="0.05" value="${(qty*0.35).toFixed(2)}"></div>
-      <button class="btn sm" type="button" data-q="${o.id}">ثبّت السعر</button><button class="btn sm ghost" type="button" data-rej="${o.id}">ارفض</button></div>
-      <p class="sub" id="pv${o.id}" data-pv="${o.id}"></p>`;
+    const qty=o.items.reduce((a,i)=>a+(i.basket?+i.count||1:+i.qty),0);
+    act=`<h4>التسعير</h4><div class="row"><div class="field"><label for="sa${o.id}">المجموع بشي ان بعد الخصم (درهم)</label><input id="sa${o.id}" type="number" step="0.01" inputmode="decimal" value="${+o.sale_aed?(+o.sale_aed).toFixed(2):""}" placeholder="من سلة الزبون"></div>
+      <div class="field"><label for="k${o.id}">الوزن (كغم)</label><input id="k${o.id}" type="number" step="0.05" value="${(qty*0.35).toFixed(2)}"></div></div>
+      <div class="pv" id="pv${o.id}" data-pv="${o.id}"></div>
+      <div class="row"><button class="btn" style="flex:2" type="button" data-q="${o.id}">أرسل السعر للزبون</button><button class="btn ghost" style="flex:1" type="button" data-rej="${o.id}">ارفض</button></div>`;
   }else if(o.status==="quoted"||o.status==="accepted"){
-    body=`<p class="sub">المجموع <b class="num">${iqd(o.total_iqd)}</b> · ربحك <b class="num">${iqd(o.comm_iqd)}</b> · العربون ${iqd(o.deposit_iqd)} · الباقي عند الاستلام ${iqd(o.total_iqd-o.deposit_iqd)}${o.coupon_code?` · استعمل كوبون <b class="ltr">${esc(o.coupon_code)}</b> بالشراء`:""}</p>`;
-    if(o.status==="accepted")body+=`<div class="row"><label class="sub" style="display:flex;gap:6px;align-items:center"><input type="checkbox" style="width:auto" data-paid="${o.id}"${o.deposit_paid?" checked":""}> استلمت العربون</label>
-      <select style="width:auto" aria-label="حالة الطلب" data-st="${o.id}">${STAGES.map((s,i)=>`<option value="${i}"${i===o.stage?" selected":""}>${s}</option>`).join("")}</select>
-      <label class="sub" style="display:flex;gap:6px;align-items:center">يوصل تقريباً <input type="date" style="width:auto" data-eta="${o.id}" value="${o.eta||""}"></label></div>`;
+    act=`<div class="sum"><div>المجموع<b class="num">${iqd(o.total_iqd)}</b></div><div class="me">ربحك<b class="num">${iqd(o.comm_iqd)}</b></div><div>العربون<b class="num">${iqd(o.deposit_iqd)}</b></div><div>الباقي عند الاستلام<b class="num">${iqd(o.total_iqd-o.deposit_iqd)}</b></div></div>
+      ${o.coupon_code?`<p class="hint">استعمل كوبون <b class="ltr">${esc(o.coupon_code)}</b> من تشتري بشي ان.</p>`:""}`;
+    if(o.status==="quoted")act+=`<p class="hint">⏳ انتظر الزبون يوافق على السعر.</p>`;
+    else act+=`<label class="tog"><input type="checkbox" data-paid="${o.id}"${o.deposit_paid?" checked":""}> استلمت العربون</label>
+      <h4>وين وصل الطلب؟</h4><div class="steps">${STAGES.map((s,i)=>`<button type="button" class="${i<=o.stage&&o.deposit_paid?"done":""}" data-stg="${o.id}:${i}">${s}</button>`).join("")}</div>
+      <div class="row"><div class="field" style="max-width:220px"><label for="eta${o.id}">يوصل للزبون تقريباً</label><input id="eta${o.id}" type="date" data-eta="${o.id}" value="${o.eta||""}"></div></div>`;
   }
   const tel=o.phone.replace(/^0/,"964");
-  return`<div class="ao${o.status==="pending"?" pending":""}"><div class="row" style="justify-content:space-between"><b>#${o.id} · ${esc(o.customer_name)}</b><span class="pill ${o.status==="pending"?"wait":o.status==="accepted"?"ok":o.status==="quoted"?"new":"off"}">${ST[o.status]}</span></div>
-    <p class="sub">${esc(o.city)}${o.address?` · ${esc(o.address)}`:""} · <a class="ltr" href="https://wa.me/${esc(tel)}" target="_blank" rel="noopener">${esc(o.phone)}</a> · ${new Date(o.created_at).toLocaleString("ar-IQ")}</p>
-    ${o.note?`<p class="sub">ملاحظة: ${esc(o.note)}</p>`:""}<ul>${items}</ul>${body}</div>`;
+  const pill=o.status==="accepted"&&o.stage>=4?["ok","تسلّم ✓"]:[o.status==="pending"?"wait":o.status==="accepted"?"ok":o.status==="quoted"?"new":"off",ST[o.status]];
+  return`<div class="ao${o.status==="pending"?" pending":""}">
+    <div class="ao-h"><b>#${o.id} · ${esc(o.customer_name)}</b><span class="pill ${pill[0]}">${pill[1]}</span></div>
+    <div class="ao-c"><span>📍 ${esc(o.city)}${o.address?` · ${esc(o.address)}`:""}</span><a class="wa ltr" href="https://wa.me/${esc(tel)}" target="_blank" rel="noopener">واتساب ${esc(o.phone)}</a><span>${new Date(o.created_at).toLocaleString("ar-IQ",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}</span>${o.note?`<span>📝 ${esc(o.note)}</span>`:""}</div>
+    <div class="ao-i">${items}</div>${act?`<div class="ao-a">${act}</div>`:""}</div>`;
 }
 function bind(){
   const A=$("app");
+  A.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;view()});
   A.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filter=b.dataset.f;view()});
-  $("reload").onclick=async()=>{await load();view()};
   const preview=id=>{const S=settings,el=$("pv"+id);if(!S||!el)return;const sale=+$("sa"+id).value||0,kg=+$("k"+id).value||0;
-    if(!(sale>0)){el.innerHTML="اكتب مجموع السلة بالدرهم ويطلعلك السعر هنا.";return}
+    if(!(sale>0)){el.innerHTML=`<span class="hint">اكتب المجموع بالدرهم ويطلعلك السعر بالدينار هنا.</span>`;return}
     const c=coupons.filter(x=>x.active&&sale>=+x.min_aed).sort((a,b)=>b.pct-a.pct)[0],net=sale-(c?sale*c.pct/100:0);
     const goods=Math.round(net*S.rate_aed),ship=Math.round(kg*S.ship_per_kg),comm=Math.round(goods*S.commission_pct/100),tot=goods+ship+comm+ +S.delivery;
-    el.innerHTML=`السعر للزبون: <b class="num">${iqd(tot)}</b> · بضاعة ${iqd(goods)} · شحن ${iqd(ship)} · ربحك ${iqd(comm)} · توصيل ${iqd(S.delivery)}${c?` · بكوبون ${esc(c.code)}`:""}`};
+    el.innerHTML=`<span class="hint">السعر للزبون</span><span class="big num">${iqd(tot)}</span><span class="hint">بضاعة ${iqd(goods)} · شحن ${iqd(ship)} · توصيل ${iqd(S.delivery)} · <b style="color:var(--ok)">ربحك ${iqd(comm)}</b>${c?` · بكوبون ${esc(c.code)}`:""}</span>`};
   A.querySelectorAll("[data-pv]").forEach(x=>{const id=+x.dataset.pv;preview(id);$("sa"+id).oninput=$("k"+id).oninput=()=>preview(id)});
-  A.querySelectorAll("[data-q]").forEach(b=>b.onclick=async()=>{const id=+b.dataset.q;if(!(+$("sa"+id).value>0)){$("pv"+id).textContent="اكتب مجموع السلة بالدرهم أول.";return}b.disabled=true;
+  A.querySelectorAll("[data-q]").forEach(b=>b.onclick=async()=>{const id=+b.dataset.q;if(!(+$("sa"+id).value>0)){$("pv"+id).innerHTML=`<span class="err">اكتب المجموع بالدرهم أول.</span>`;return}b.disabled=true;
     const {error}=await db.rpc("quote_order",{p_id:id,p_kg:+$("k"+id).value||0,p_sale_aed:+$("sa"+id).value||null});
     if(error){alert(error.message)}await load();view();});
   A.querySelectorAll("[data-rej]").forEach(b=>b.onclick=async()=>{await db.from("orders").update({status:"rejected"}).eq("id",+b.dataset.rej);await load();view()});
   A.querySelectorAll("[data-paid]").forEach(x=>x.onchange=async()=>{await db.from("orders").update({deposit_paid:x.checked}).eq("id",+x.dataset.paid);await load();view()});
   A.querySelectorAll("[data-eta]").forEach(x=>x.onchange=async()=>{await db.from("orders").update({eta:x.value||null}).eq("id",+x.dataset.eta);await load();view()});
-  A.querySelectorAll("[data-st]").forEach(x=>x.onchange=async()=>{await db.from("orders").update({stage:+x.value}).eq("id",+x.dataset.st);await load();view()});
+  A.querySelectorAll("[data-stg]").forEach(x=>x.onclick=async()=>{const [id,st]=x.dataset.stg.split(":").map(Number);await db.from("orders").update({stage:st}).eq("id",id);await load();view()});
   A.querySelectorAll("[data-on]").forEach(x=>x.onchange=async()=>{await db.from("coupons").update({active:x.checked}).eq("id",+x.dataset.on);await load();view()});
   A.querySelectorAll("[data-del]").forEach(x=>x.onclick=async()=>{await db.from("coupons").delete().eq("id",+x.dataset.del);await load();view()});
-  $("addC").onclick=async()=>{const code=$("nCode").value.trim().toUpperCase();if(!code)return;await db.from("coupons").insert({code,pct:+$("nPct").value,min_aed:+$("nMin").value||0});await load();view()};
-  $("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,"").replace(/^0(?=7)/,"964"),shein_url:$("sUrl").value.trim(),rate_aed:+$("sRate").value,ship_per_kg:+$("sShip").value,commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
+  if($("addC"))$("addC").onclick=async()=>{const code=$("nCode").value.trim().toUpperCase();if(!code)return;await db.from("coupons").insert({code,pct:+$("nPct").value,min_aed:+$("nMin").value||0});await load();view()};
+  if($("saveS"))$("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,"").replace(/^0(?=7)/,"964"),shein_url:$("sUrl").value.trim(),rate_aed:+$("sRate").value,ship_per_kg:+$("sShip").value,commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
 }
 async function boot(){
   if(!db){$("app").innerHTML=`<p class="err">الموقع بعده مو مربوط بقاعدة البيانات.</p>`;return}
