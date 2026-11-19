@@ -24,7 +24,7 @@
 <script src="supabase.js"></script>
 <script>
 const cfg=window.TALABITI||{};
-const db=cfg.SUPABASE_URL?supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY):null;
+const db=(cfg.SUPABASE_URL&&window.supabase)?supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY):null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const iqd=n=>Math.round(+n||0).toLocaleString("en-US")+" د.ع";
@@ -38,7 +38,8 @@ let tab="home",flash="",draft={};
 // رابط مشارك من تطبيق شي ان (أندرويد) أو ?link=
 const qp=new URLSearchParams(location.search);
 const shared=[qp.get("url"),qp.get("text"),qp.get("link")].filter(Boolean).join(" ");
-const m=shared.match(/https?:\/\/[^\s]*shein\.com[^\s]*/i);
+const LINK_RE=/https?:\/\/[^\s]*shein\.(com|top)[^\s]*/i;
+const m=shared.match(LINK_RE);
 if(m){draft.link=m[0];tab="add";history.replaceState(null,"",location.pathname)}
 
 function bestCoupon(sale){return coupons.filter(c=>sale>=+c.min_aed).sort((a,b)=>b.pct-a.pct)[0]||null}
@@ -55,21 +56,30 @@ function render(){
   const notice=!db?`<p class="err">الموقع بعده مو مربوط بقاعدة البيانات.</p>`:"";
   if(tab==="home"){
     el.innerHTML=`${notice}
+      <div class="card" style="border:2px solid var(--accent)"><h3>رجعت من شي ان؟ الصق رابط القطعة هنا</h3>
+        <div class="field"><input id="hLink" class="ltr" inputmode="url" placeholder="الصق الرابط هنا" aria-label="رابط القطعة"></div>
+        <div class="two"><button class="btn ghost" type="button" id="hPaste">📋 الصق</button><button class="btn" type="button" id="hNext">التالي</button></div>
+        <p class="err" id="hErr"></p></div>
       <div class="hero"><h2>تسوّق من شي ان الإمارات، وإحنا نوصلها لباب بيتك</h2>
         <p>كل الخصومات اللي تشوفها بشي ان تنحسبلك، وفوكاها كوبونات عروض اليوم.</p>
         <a class="btn" href="${esc(settings.shein_url)}" target="_blank" rel="noopener">تسوّق من شي ان</a></div>
-      ${coupons.length?`<h3>عروض اليوم</h3>${coupons.map(c=>`<div class="coupon"><div><b>خصم ${+c.pct}%</b><p class="sub">${+c.min_aed?`على طلبك فوق ${+c.min_aed} درهم`:"على أي طلب"}</p></div><span class="pill new ltr">${esc(c.code)}</span></div>`).join("")}<p class="sub">ما تحتاج تكتب الكود، ينحسب وحده على طلبك.</p>`:""}
       <div class="card"><h3>شلون تطلب</h3><ol class="howto">
-        <li>اضغط «تسوّق من شي ان» واختار اللي يعجبك</li>
-        <li>انسخ رابط القطعة من زر المشاركة، وارجع هنا لـ «أضف قطعة»</li>
+        <li>اضغط «تسوّق من شي ان»، ينفتح شي ان بصفحة ثانية. اختار القطعة اللي تعجبك</li>
+        <li>بصفحة القطعة اضغط زر المشاركة <b>↗</b> واختار <b>نسخ الرابط</b></li>
+        <li>ارجع لهالصفحة (من التبويبات أو زر الرجوع)، اضغط <b>📋 الصق</b> فوق، و«التالي»</li>
+        <li>اكتب السعر والقياس، ضيفها للسلة، وكرر لكل قطعة</li>
         <li>أرسل سلتك، ويوصلك السعر النهائي بالدينار. ما تدفع شي قبل ما توافق</li></ol></div>
-      <button class="btn ghost" type="button" id="goAdd">أضف قطعة للسلة</button>
+      ${coupons.length?`<h3>عروض اليوم</h3>${coupons.map(c=>`<div class="coupon"><div><b>خصم ${+c.pct}%</b><p class="sub">${+c.min_aed?`على طلبك فوق ${+c.min_aed} درهم`:"على أي طلب"}</p></div><span class="pill new ltr">${esc(c.code)}</span></div>`).join("")}<p class="sub">ما تحتاج تكتب الكود، ينحسب وحده على طلبك.</p>`:""}
+      <p class="sub" style="text-align:center">نصيحة: ضيف هالموقع لشاشة موبايلك (من قائمة المتصفح ← إضافة للشاشة الرئيسية) حتى ترجعله بسرعة.</p>
       ${settings.whatsapp?`<p class="sub" style="text-align:center">عندك سؤال؟ واتساب: <a class="ltr" href="https://wa.me/${esc(settings.whatsapp)}" target="_blank" rel="noopener">${esc(settings.whatsapp)}</a></p>`:""}`;
-    $("goAdd").onclick=()=>go("add");return;
+    $("hPaste").onclick=async()=>{try{const t=await navigator.clipboard.readText();$("hLink").value=t;$("hErr").textContent=""}catch{$("hErr").textContent="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق."}};
+    $("hNext").onclick=()=>{const lm=$("hLink").value.match(LINK_RE);if(!lm){$("hErr").textContent="هذا مو رابط من شي ان. انسخه من زر المشاركة بصفحة القطعة.";return}draft={link:lm[0]};go("add")};
+    return;
   }
   if(tab==="add"){
-    el.innerHTML=`<h3>أضف قطعة من شي ان</h3>
+    el.innerHTML=`<h3>أضف قطعة من شي ان</h3>${draft.link?`<p class="sub">✓ وصل الرابط. هسه اكتب تفاصيل القطعة مثل ما تشوفها بشي ان.</p>`:""}
       <div class="field"><label for="dLink">رابط القطعة</label><input id="dLink" class="ltr" inputmode="url" placeholder="الصق الرابط هنا" value="${esc(draft.link)}"></div>
+      ${draft.link?"":`<button class="btn ghost" type="button" id="dPaste">📋 الصق الرابط</button>`}
       <div class="field"><label for="dName">شنو القطعة؟</label><input id="dName" value="${esc(draft.name)}" placeholder="مثلاً: فستان أسود"></div>
       <div class="two">
         <div class="field"><label for="dOrig">السعر الأصلي (درهم)</label><input id="dOrig" type="number" step="0.01" inputmode="decimal" value="${esc(draft.orig)}"></div>
@@ -83,9 +93,10 @@ function render(){
       <p class="err" id="err"></p>
       <button class="btn" type="button" id="addCart">أضف للسلة</button>
       <a class="btn ghost" href="${esc(settings.shein_url)}" target="_blank" rel="noopener">ارجع لشي ان</a>`;
+    if($("dPaste"))$("dPaste").onclick=async()=>{try{$("dLink").value=await navigator.clipboard.readText()}catch{$("err").textContent="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق."}};
     $("addCart").onclick=()=>{
       const it={link:$("dLink").value.trim(),name:$("dName").value.trim(),orig:+$("dOrig").value,sale:+$("dSale").value||+$("dOrig").value,size:$("dSize").value.trim()||"—",qty:Math.min(20,Math.max(1,+$("dQty").value||1))};
-      const lm=it.link.match(/https?:\/\/[^\s]*shein\.com[^\s]*/i);
+      const lm=it.link.match(LINK_RE);
       if(!lm){$("err").textContent="الصق رابط القطعة من شي ان.";return}
       it.link=lm[0];
       if(!it.name||!(it.orig>0)){$("err").textContent="اكتب شنو القطعة وسعرها.";return}

@@ -105,7 +105,7 @@ begin
   if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 or jsonb_array_length(p_items) > 40 then
     raise exception 'السلة فارغة أو كبيرة'; end if;
   for it in select * from jsonb_array_elements(p_items) loop
-    if coalesce(it->>'link','') !~* '^https?://([a-z0-9-]+\.)*shein\.com' then raise exception 'رابط غير صحيح'; end if;
+    if coalesce(it->>'link','') !~* '^https?://([a-z0-9-]+\.)*shein\.(com|top)' then raise exception 'رابط غير صحيح'; end if;
     if (it->>'qty')::int < 1 or (it->>'qty')::int > 20 or (it->>'orig')::numeric <= 0 then raise exception 'بيانات قطعة غير صحيحة'; end if;
     v_orig := v_orig + (it->>'orig')::numeric * (it->>'qty')::int;
     v_sale := v_sale + least((it->>'sale')::numeric, (it->>'orig')::numeric) * (it->>'qty')::int;
