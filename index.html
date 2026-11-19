@@ -62,13 +62,14 @@ function render(){
   const notice=!db?`<p class="err">الموقع بعده مو مربوط بقاعدة البيانات.</p>`:"";
   if(tab==="home"){
     el.innerHTML=`${notice}
-      ${IN_APP?"":`<div class="card" style="border:2px solid var(--accent)"><h3>رجعت من شي ان؟ الصق رابط القطعة هنا</h3>
+      ${IN_APP?"":`<div class="card" style="border:2px solid var(--accent)"><h3>رجعت من شي ان؟ الصق رابط القطعة أو رابط سلتك هنا</h3>
         <div class="field"><input id="hLink" class="ltr" inputmode="url" placeholder="الصق الرابط هنا" aria-label="رابط القطعة"></div>
         <div class="two"><button class="btn ghost" type="button" id="hPaste">📋 الصق</button><button class="btn" type="button" id="hNext">التالي</button></div>
         <p class="err" id="hErr"></p></div>`}
       <div class="hero"><h2>تسوّق من شي ان الإمارات، وإحنا نوصلها لباب بيتك</h2>
         <p>كل الخصومات اللي تشوفها بشي ان تنحسبلك، وفوكاها كوبونات عروض اليوم.</p>
         <a class="btn" href="${esc(settings.shein_url)}" target="_blank" rel="noopener">تسوّق من شي ان</a></div>
+      <button class="btn ghost" type="button" id="goCart">عندك سلة جاهزة بشي ان؟ الصق رابطها</button>
       <div class="card"><h3>شلون تطلب</h3>${IN_APP?`<ol class="howto">
         <li>اضغط «تسوّق من شي ان» وتصفح عادي</li>
         <li>بصفحة القطعة اختار القياس واضغط <b>＋ أضف لطلبي</b></li>
@@ -82,29 +83,44 @@ function render(){
       ${coupons.length?`<h3>عروض اليوم</h3>${coupons.map(c=>`<div class="coupon"><div><b>خصم ${+c.pct}%</b><p class="sub">${+c.min_aed?`على طلبك فوق ${+c.min_aed} درهم`:"على أي طلب"}</p></div><span class="pill new ltr">${esc(c.code)}</span></div>`).join("")}<p class="sub">ما تحتاج تكتب الكود، ينحسب وحده على طلبك.</p>`:""}
       ${IN_APP?"":`<p class="sub" style="text-align:center">نصيحة: ضيف هالموقع لشاشة موبايلك (من قائمة المتصفح ← إضافة للشاشة الرئيسية) حتى ترجعله بسرعة.</p>`}
       ${settings.whatsapp?`<p class="sub" style="text-align:center">عندك سؤال؟ واتساب: <a class="ltr" href="https://wa.me/${esc(settings.whatsapp)}" target="_blank" rel="noopener">${esc(settings.whatsapp)}</a></p>`:""}`;
+    $("goCart").onclick=()=>{draft={cart:true};go("add")};
     if($("hPaste"))$("hPaste").onclick=async()=>{try{const t=await navigator.clipboard.readText();$("hLink").value=t;$("hErr").textContent=""}catch{$("hErr").textContent="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق."}};
-    if($("hNext"))$("hNext").onclick=()=>{const lm=$("hLink").value.match(LINK_RE);if(!lm){$("hErr").textContent="هذا مو رابط من شي ان. انسخه من زر المشاركة بصفحة القطعة.";return}draft={link:lm[0]};go("add")};
+    if($("hNext"))$("hNext").onclick=()=>{const lm=$("hLink").value.match(LINK_RE);if(!lm){$("hErr").textContent="هذا مو رابط من شي ان. انسخه من زر المشاركة بصفحة القطعة.";return}draft={link:lm[0],cart:/cart|bag|share/i.test(lm[0])};go("add")};
     return;
   }
   if(tab==="add"){
-    el.innerHTML=`<h3>أضف قطعة من شي ان</h3>${draft.img?`<img src="${esc(draft.img)}" alt="" style="width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:var(--card)">`:""}${draft.link?`<p class="sub">✓ وصلت القطعة. تأكد من السعر والقياس مثل ما تشوفها بشي ان.</p>`:""}
-      <div class="field"><label for="dLink">رابط القطعة</label><input id="dLink" class="ltr" inputmode="url" placeholder="الصق الرابط هنا" value="${esc(draft.link)}"></div>
+    const C=!!draft.cart;
+    el.innerHTML=`<div class="two"><button type="button" class="btn ${C?"ghost":""}" id="mItem">قطعة وحدة</button><button type="button" class="btn ${C?"":"ghost"}" id="mCart">سلة كاملة</button></div>
+      <h3>${C?"أرسل سلتك من شي ان":"أضف قطعة من شي ان"}</h3>${!C&&draft.img?`<img src="${esc(draft.img)}" alt="" style="width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:var(--card)">`:""}
+      ${C?`<p class="sub">بتطبيق شي ان افتح السلة ← زر المشاركة ↗ ← نسخ الرابط، والصقه هنا. حامد يفتح سلتك ويشوف كل القطع اللي اخترتها.</p>`:(draft.link?`<p class="sub">✓ وصلت القطعة. تأكد من السعر والقياس مثل ما تشوفها بشي ان.</p>`:"")}
+      <div class="field"><label for="dLink">${C?"رابط السلة":"رابط القطعة"}</label><input id="dLink" class="ltr" inputmode="url" placeholder="الصق الرابط هنا" value="${esc(draft.link)}"></div>
       ${draft.link?"":`<button class="btn ghost" type="button" id="dPaste">📋 الصق الرابط</button>`}
-      <div class="field"><label for="dName">شنو القطعة؟</label><input id="dName" value="${esc(draft.name)}" placeholder="مثلاً: فستان أسود"></div>
+      ${C?`<div class="field"><label for="dCount">كم قطعة بالسلة؟</label><input id="dCount" type="number" min="1" max="200" inputmode="numeric" value="${esc(draft.count||"")}"></div>`
+         :`<div class="field"><label for="dName">شنو القطعة؟</label><input id="dName" value="${esc(draft.name)}" placeholder="مثلاً: فستان أسود"></div>`}
       <div class="two">
-        <div class="field"><label for="dOrig">السعر الأصلي (درهم)</label><input id="dOrig" type="number" step="0.01" inputmode="decimal" value="${esc(draft.orig)}"></div>
-        <div class="field"><label for="dSale">بعد الخصم (درهم)</label><input id="dSale" type="number" step="0.01" inputmode="decimal" value="${esc(draft.sale)}" placeholder="إذا بيها خصم"></div>
+        <div class="field"><label for="dOrig">${C?"مجموع السلة قبل الخصم (درهم)":"السعر الأصلي (درهم)"}</label><input id="dOrig" type="number" step="0.01" inputmode="decimal" value="${esc(draft.orig)}"></div>
+        <div class="field"><label for="dSale">${C?"المجموع بعد الخصم (درهم)":"بعد الخصم (درهم)"}</label><input id="dSale" type="number" step="0.01" inputmode="decimal" value="${esc(draft.sale)}" placeholder="إذا بيها خصم"></div>
       </div>
-      <div class="two">
+      ${C?"":`<div class="two">
         <div class="field"><label for="dSize">القياس واللون</label><input id="dSize" value="${esc(draft.size)}" placeholder="M، أسود"></div>
         <div class="field"><label for="dQty">العدد</label><input id="dQty" type="number" min="1" max="20" value="${esc(draft.qty||1)}"></div>
-      </div>
-      <p class="sub">اكتب السعر مثل ما تشوفه بشي ان. نتأكد منه قبل التسعير.</p>
+      </div>`}
+      <p class="sub">${C?"اكتب المجموع مثل ما يطلعلك بسلة شي ان. حامد يتأكد منه قبل التسعير.":"اكتب السعر مثل ما تشوفه بشي ان. نتأكد منه قبل التسعير."}</p>
       <p class="err" id="err"></p>
-      <button class="btn" type="button" id="addCart">أضف للسلة</button>
+      <button class="btn" type="button" id="addCart">${C?"أضف السلة لطلبي":"أضف للسلة"}</button>
       <a class="btn ghost" href="${esc(settings.shein_url)}" target="_blank" rel="noopener">ارجع لشي ان</a>`;
+    const keep=()=>{draft.link=$("dLink").value;draft.orig=$("dOrig").value;draft.sale=$("dSale").value;if($("dName"))draft.name=$("dName").value;if($("dCount"))draft.count=$("dCount").value};
+    $("mItem").onclick=()=>{keep();draft.cart=false;render()};
+    $("mCart").onclick=()=>{keep();draft.cart=true;render()};
     if($("dPaste"))$("dPaste").onclick=async()=>{try{$("dLink").value=await navigator.clipboard.readText()}catch{$("err").textContent="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق."}};
     $("addCart").onclick=()=>{
+      if(C){
+        const lm=$("dLink").value.match(LINK_RE),n=Math.round(+$("dCount").value||0),orig=+$("dOrig").value;let sale=+$("dSale").value||orig;
+        if(!lm){$("err").textContent="الصق رابط سلتك من شي ان.";return}
+        if(!(n>0)||!(orig>0)){$("err").textContent="اكتب عدد القطع ومجموع السلة.";return}
+        if(sale>orig)sale=orig;
+        cart.push({link:lm[0],name:`سلة شي ان كاملة (${n} قطعة)`,size:"—",qty:1,orig,sale,img:"",basket:true,count:n});saveCart();draft={};flash="انضافت سلتك ✓";go("cart");return;
+      }
       const it={link:$("dLink").value.trim(),name:$("dName").value.trim(),orig:+$("dOrig").value,sale:+$("dSale").value||+$("dOrig").value,size:$("dSize").value.trim()||"—",img:draft.img||"",qty:Math.min(20,Math.max(1,+$("dQty").value||1))};
       const lm=it.link.match(LINK_RE);
       if(!lm){$("err").textContent="الصق رابط القطعة من شي ان.";return}
