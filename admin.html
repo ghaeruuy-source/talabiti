@@ -127,7 +127,7 @@ function bind(){
   A.querySelectorAll("[data-on]").forEach(x=>x.onchange=async()=>{await db.from("coupons").update({active:x.checked}).eq("id",+x.dataset.on);await load();view()});
   A.querySelectorAll("[data-del]").forEach(x=>x.onclick=async()=>{await db.from("coupons").delete().eq("id",+x.dataset.del);await load();view()});
   $("addC").onclick=async()=>{const code=$("nCode").value.trim().toUpperCase();if(!code)return;await db.from("coupons").insert({code,pct:+$("nPct").value,min_aed:+$("nMin").value||0});await load();view()};
-  $("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,""),shein_url:$("sUrl").value.trim(),rate_aed:+$("sRate").value,ship_per_kg:+$("sShip").value,commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
+  $("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,"").replace(/^0(?=7)/,"964"),shein_url:$("sUrl").value.trim(),rate_aed:+$("sRate").value,ship_per_kg:+$("sShip").value,commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
 }
 async function boot(){
   if(!db){$("app").innerHTML=`<p class="err">الموقع بعده مو مربوط بقاعدة البيانات.</p>`;return}
