@@ -106,7 +106,7 @@ function card(o){
       <button class="btn sm" type="button" data-q="${o.id}">ثبّت السعر</button><button class="btn sm ghost" type="button" data-rej="${o.id}">ارفض</button></div>
       <p class="sub" id="pv${o.id}" data-pv="${o.id}"></p>`;
   }else if(o.status==="quoted"||o.status==="accepted"){
-    body=`<p class="sub">المجموع <b class="num">${iqd(o.total_iqd)}</b> · ربحك <b class="num">${iqd(o.comm_iqd)}</b> · العربون ${iqd(o.deposit_iqd)}${o.coupon_code?` · استعمل كوبون <b class="ltr">${esc(o.coupon_code)}</b> بالشراء`:""}</p>`;
+    body=`<p class="sub">المجموع <b class="num">${iqd(o.total_iqd)}</b> · ربحك <b class="num">${iqd(o.comm_iqd)}</b> · العربون ${iqd(o.deposit_iqd)} · الباقي عند الاستلام ${iqd(o.total_iqd-o.deposit_iqd)}${o.coupon_code?` · استعمل كوبون <b class="ltr">${esc(o.coupon_code)}</b> بالشراء`:""}</p>`;
     if(o.status==="accepted")body+=`<div class="row"><label class="sub" style="display:flex;gap:6px;align-items:center"><input type="checkbox" style="width:auto" data-paid="${o.id}"${o.deposit_paid?" checked":""}> استلمت العربون</label>
       <select style="width:auto" aria-label="حالة الطلب" data-st="${o.id}">${STAGES.map((s,i)=>`<option value="${i}"${i===o.stage?" selected":""}>${s}</option>`).join("")}</select>
       <label class="sub" style="display:flex;gap:6px;align-items:center">يوصل تقريباً <input type="date" style="width:auto" data-eta="${o.id}" value="${o.eta||""}"></label></div>`;
