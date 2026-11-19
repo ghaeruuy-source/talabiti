@@ -97,7 +97,7 @@ function view(){
   bind();
 }
 function card(o){
-  const items=o.items.map(i=>`<li>${i.img?`<img src="${esc(i.img)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;vertical-align:middle;margin-inline-end:8px">`:""}${esc(i.name)} · ${esc(i.size)} × ${i.qty} · ${i.sale<i.orig?`<s>${aed(i.orig)}</s> `:""}${aed(i.sale)}<br><a class="ltr" href="${esc(i.link)}" target="_blank" rel="noopener">${esc(i.link)}</a></li>`).join("");
+  const items=o.items.map(i=>`<li>${i.img?`<img src="${esc(i.img)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;vertical-align:middle;margin-inline-end:8px">`:""}${i.basket?`<b>${esc(i.name)}</b><br><a class="btn" style="display:inline-block;margin-top:6px" href="${esc(i.link)}" target="_blank" rel="noopener">🛍️ افتح سلة الزبون بشي ان</a><br><span class="sub">شوف المجموع بعد الخصم واكتبه تحت بالتسعير.</span>`:`${esc(i.name)} · ${esc(i.size)} × ${i.qty} · ${i.sale<i.orig?`<s>${aed(i.orig)}</s> `:""}${aed(i.sale)}<br><a class="ltr" href="${esc(i.link)}" target="_blank" rel="noopener">${esc(i.link)}</a>`}</li>`).join("");
   let body="";
   if(o.status==="pending"){
     const qty=o.items.reduce((a,i)=>a+ +i.qty,0);

@@ -97,29 +97,28 @@ function render(){
       ${draft.link?"":`<button class="btn ghost" type="button" id="dPaste">📋 الصق الرابط</button>`}
       ${C?`<div class="field"><label for="dCount">كم قطعة بالسلة؟</label><input id="dCount" type="number" min="1" max="200" inputmode="numeric" value="${esc(draft.count||"")}"></div>`
          :`<div class="field"><label for="dName">شنو القطعة؟</label><input id="dName" value="${esc(draft.name)}" placeholder="مثلاً: فستان أسود"></div>`}
-      <div class="two">
-        <div class="field"><label for="dOrig">${C?"مجموع السلة قبل الخصم (درهم)":"السعر الأصلي (درهم)"}</label><input id="dOrig" type="number" step="0.01" inputmode="decimal" value="${esc(draft.orig)}"></div>
-        <div class="field"><label for="dSale">${C?"المجموع بعد الخصم (درهم)":"بعد الخصم (درهم)"}</label><input id="dSale" type="number" step="0.01" inputmode="decimal" value="${esc(draft.sale)}" placeholder="إذا بيها خصم"></div>
-      </div>
       ${C?"":`<div class="two">
+        <div class="field"><label for="dOrig">السعر الأصلي (درهم)</label><input id="dOrig" type="number" step="0.01" inputmode="decimal" value="${esc(draft.orig)}"></div>
+        <div class="field"><label for="dSale">بعد الخصم (درهم)</label><input id="dSale" type="number" step="0.01" inputmode="decimal" value="${esc(draft.sale)}" placeholder="إذا بيها خصم"></div>
+      </div>
+      <div class="two">
         <div class="field"><label for="dSize">القياس واللون</label><input id="dSize" value="${esc(draft.size)}" placeholder="M، أسود"></div>
         <div class="field"><label for="dQty">العدد</label><input id="dQty" type="number" min="1" max="20" value="${esc(draft.qty||1)}"></div>
       </div>`}
-      <p class="sub">${C?"اكتب المجموع مثل ما يطلعلك بسلة شي ان. حامد يتأكد منه قبل التسعير.":"اكتب السعر مثل ما تشوفه بشي ان. نتأكد منه قبل التسعير."}</p>
+      ${C?"":`<p class="sub">اكتب السعر مثل ما تشوفه بشي ان. نتأكد منه قبل التسعير.</p>`}
       <p class="err" id="err"></p>
       <button class="btn" type="button" id="addCart">${C?"أضف السلة لطلبي":"أضف للسلة"}</button>
       <a class="btn ghost" href="${esc(settings.shein_url)}" target="_blank" rel="noopener">ارجع لشي ان</a>`;
-    const keep=()=>{draft.link=$("dLink").value;draft.orig=$("dOrig").value;draft.sale=$("dSale").value;if($("dName"))draft.name=$("dName").value;if($("dCount"))draft.count=$("dCount").value};
+    const keep=()=>{draft.link=$("dLink").value;if($("dOrig")){draft.orig=$("dOrig").value;draft.sale=$("dSale").value}if($("dName"))draft.name=$("dName").value;if($("dCount"))draft.count=$("dCount").value};
     $("mItem").onclick=()=>{keep();draft.cart=false;render()};
     $("mCart").onclick=()=>{keep();draft.cart=true;render()};
-    if($("dPaste"))$("dPaste").onclick=async()=>{try{$("dLink").value=await navigator.clipboard.readText()}catch{$("err").textContent="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق."}};
+    if($("dPaste"))$("dPaste").onclick=async()=>{try{const t=await navigator.clipboard.readText(),u=t.match(LINK_RE);$("dLink").value=u?u[0]:t}catch{$("err").textContent="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق."}};
     $("addCart").onclick=()=>{
       if(C){
-        const lm=$("dLink").value.match(LINK_RE),n=Math.round(+$("dCount").value||0),orig=+$("dOrig").value;let sale=+$("dSale").value||orig;
+        const lm=$("dLink").value.match(LINK_RE),n=Math.round(+$("dCount").value||0);
         if(!lm){$("err").textContent="الصق رابط سلتك من شي ان.";return}
-        if(!(n>0)||!(orig>0)){$("err").textContent="اكتب عدد القطع ومجموع السلة.";return}
-        if(sale>orig)sale=orig;
-        cart.push({link:lm[0],name:`سلة شي ان كاملة (${n} قطعة)`,size:"—",qty:1,orig,sale,img:"",basket:true,count:n});saveCart();draft={};flash="انضافت سلتك ✓";go("cart");return;
+        if(!(n>0)){$("err").textContent="اكتب كم قطعة بالسلة.";return}
+        cart.push({link:lm[0],name:`سلة شي ان كاملة (${n} قطعة)`,size:"—",qty:1,orig:0,sale:0,img:"",basket:true,count:n});saveCart();draft={};flash="انضافت سلتك ✓";go("cart");return;
       }
       const it={link:$("dLink").value.trim(),name:$("dName").value.trim(),orig:+$("dOrig").value,sale:+$("dSale").value||+$("dOrig").value,size:$("dSize").value.trim()||"—",img:draft.img||"",qty:Math.min(20,Math.max(1,+$("dQty").value||1))};
       const lm=it.link.match(LINK_RE);
@@ -136,12 +135,12 @@ function render(){
     const nextC=coupons.filter(x=>+x.min_aed>sale).sort((a,b)=>a.min_aed-b.min_aed)[0];
     el.innerHTML=`${flash?`<div class="toast">${flash}</div>`:""}<h3>سلتك</h3>
       ${cart.map((i,k)=>`<div class="line"><div class="h">${i.img?`<img src="${esc(i.img)}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex:none">`:""}<b style="flex:1">${esc(i.name)}</b><button type="button" data-k="${k}" aria-label="احذف">✕</button></div>
-        <p class="sub">${esc(i.size)} · العدد ${i.qty}</p>
-        <p class="num">${i.sale<i.orig?`<s>${aed(i.orig*i.qty)}</s> `:""}<b>${aed(i.sale*i.qty)}</b>${i.sale<i.orig?` <span class="save">-${Math.round((1-i.sale/i.orig)*100)}%</span>`:""}</p></div>`).join("")}
-      <div class="quote"><div class="q"><span>المجموع بشي ان</span><span class="num">${aed(sale)}</span></div>
+        ${i.basket?`<p class="sub">حامد يفتح سلتك ويسعّرها</p></div>`:`<p class="sub">${esc(i.size)} · العدد ${i.qty}</p>
+        <p class="num">${i.sale<i.orig?`<s>${aed(i.orig*i.qty)}</s> `:""}<b>${aed(i.sale*i.qty)}</b>${i.sale<i.orig?` <span class="save">-${Math.round((1-i.sale/i.orig)*100)}%</span>`:""}</p></div>`}`).join("")}
+      ${sale>0?`<div class="quote"><div class="q"><span>المجموع بشي ان</span><span class="num">${aed(sale)}</span></div>
         ${c?`<div class="q d"><span>كوبون ${esc(c.code)} (${+c.pct}%)</span><span class="num">-${aed(sale*c.pct/100)}</span></div>`:""}
-        ${orig>sale||c?`<div class="saved">موفّر لحد هسه ${aed(orig-sale+(c?sale*c.pct/100:0))}</div>`:""}</div>
-      ${nextC?`<p class="sub">ضيف ${aed(nextC.min_aed-sale)} وتاخذ خصم ${+nextC.pct}% بكوبون ${esc(nextC.code)}.</p>`:""}
+        ${orig>sale||c?`<div class="saved">موفّر لحد هسه ${aed(orig-sale+(c?sale*c.pct/100:0))}</div>`:""}</div>`:""}
+      ${nextC&&sale>0?`<p class="sub">ضيف ${aed(nextC.min_aed-sale)} وتاخذ خصم ${+nextC.pct}% بكوبون ${esc(nextC.code)}.</p>`:""}
       <div class="card"><h3>معلومات التوصيل</h3>
         <div class="field"><label for="cName">الاسم</label><input id="cName" autocomplete="name" value="${esc(me.name)}"></div>
         <div class="field"><label for="cPhone">رقم الموبايل</label><input id="cPhone" class="ltr" inputmode="tel" autocomplete="tel" placeholder="07xx xxx xxxx" value="${esc(me.phone)}"></div>
