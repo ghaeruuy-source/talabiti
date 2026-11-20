@@ -72,6 +72,9 @@ const iqd=n=>Math.round(+n||0).toLocaleString("en-US")+" د.ع";
 const aed=n=>(+n||0).toFixed(2)+" درهم";
 const STAGES=["انطلب من شي ان","بالطريق للعراق","وصل المخزن","بالتوصيل","تسلّم"];
 const ST={pending:"جديد، يحتاج تسعير",quoted:"انرسل السعر",accepted:"وافق الزبون",rejected:"مرفوض",cancelled:"ملغي"};
+const USD_AED=3.6725;
+const curPref=()=>{try{return localStorage.getItem("cur")==="USD"?"USD":"AED"}catch{return "AED"}};
+const rateShown=()=>{const r=+settings?.rate_aed||0;return curPref()==="USD"?Math.round(r*USD_AED):r};
 let orders=[],coupons=[],expenses=[],expOk=false,settings=null,filter="open",tab="orders";
 
 function loginView(msg=""){
@@ -126,7 +129,8 @@ function view(){
       <button class="btn" type="button" id="addC">أضف الكوبون</button></div>
     <div class="card"><h3>الأسعار</h3>
       <div class="row">
-        <div class="field"><label for="sRate">سعر الصرف: الدرهم بكم دينار؟</label><input id="sRate" type="number" value="${+settings?.rate_aed}"></div>
+        <div class="field"><label for="sCur">سعر الصرف حسب</label><select id="sCur"><option value="AED"${curPref()==="AED"?" selected":""}>الدرهم</option><option value="USD"${curPref()==="USD"?" selected":""}>الدولار</option></select></div>
+        <div class="field"><label for="sRate" id="sRateL">${curPref()==="USD"?"الدولار بكم دينار؟":"الدرهم بكم دينار؟"}</label><input id="sRate" type="number" inputmode="decimal" step="any" value="${rateShown()}"></div>
         <div class="field"><label for="sComm">ربحك (عمولة ٪)</label><input id="sComm" type="number" value="${+settings?.commission_pct}"></div></div>
       <div class="row">
         <div class="field"><label for="sShip">الشحن لكل كيلو (دينار)</label><input id="sShip" type="number" value="${+settings?.ship_per_kg}"></div>
@@ -136,7 +140,7 @@ function view(){
       <div class="field"><label for="sName">اسم الصفحة</label><input id="sName" value="${esc(settings?.shop_name)}"></div>
       <div class="field"><label for="sWa">رقم الواتساب</label><input id="sWa" class="ltr" value="${esc(settings?.whatsapp)}"></div>
       <div class="field"><label for="sUrl">رابط شي ان</label><input id="sUrl" class="ltr" value="${esc(settings?.shein_url)}"></div>
-      <p class="sub" id="sMsg"></p>
+      <p class="hint">الأسعار بشي ان الإمارات بالدرهم. إذا اخترت الدولار، الموقع يحوله للدرهم بالسعر الثابت (١ دولار = ٣.٦٧٢٥ درهم) وبعدها للدينار.</p><p class="sub" id="sMsg"></p>
       <button class="btn" type="button" id="saveS">احفظ</button></div>`;
   $("app").innerHTML=`<div class="top">${T.map(([k,l,n])=>`<button type="button" data-tab="${k}" aria-current="${tab===k}">${l}${n?`<span class="dot">${n}</span>`:""}</button>`).join("")}</div>${body}`;
   bind();
@@ -190,7 +194,10 @@ function bind(){
     const {error}=await db.from("expenses").insert({title:t,category:$("xCat").value,amount_iqd:a,spent_on:$("xDate").value||undefined});if(error){$("xErr").textContent=error.message;return}await load();view()};
   A.querySelectorAll("[data-delx]").forEach(x=>x.onclick=async()=>{if(!confirm("تحذف هذا المصروف؟"))return;await db.from("expenses").delete().eq("id",+x.dataset.delx);await load();view()});
   if($("addC"))$("addC").onclick=async()=>{const code=$("nCode").value.trim().toUpperCase();if(!code)return;await db.from("coupons").insert({code,pct:+$("nPct").value,min_aed:+$("nMin").value||0});await load();view()};
-  if($("saveS"))$("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,"").replace(/^0(?=7)/,"964"),shein_url:$("sUrl").value.trim(),rate_aed:+$("sRate").value,ship_per_kg:+$("sShip").value,commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
+  if($("sCur"))$("sCur").onchange=()=>{const old=curPref(),nw=$("sCur").value,v=+$("sRate").value||0;
+    const aed=old==="USD"?v/USD_AED:v;try{localStorage.setItem("cur",nw)}catch{}
+    $("sRate").value=nw==="USD"?Math.round(aed*USD_AED):Math.round(aed*100)/100;$("sRateL").textContent=nw==="USD"?"الدولار بكم دينار؟":"الدرهم بكم دينار؟"};
+  if($("saveS"))$("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,"").replace(/^0(?=7)/,"964"),shein_url:$("sUrl").value.trim(),rate_aed:Math.round((($("sCur").value==="USD"?+$("sRate").value/USD_AED:+$("sRate").value))*10000)/10000,ship_per_kg:+$("sShip").value,commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
 }
 async function boot(){
   if(!db){$("app").innerHTML=`<p class="err">الموقع بعده مو مربوط بقاعدة البيانات.</p>`;return}
