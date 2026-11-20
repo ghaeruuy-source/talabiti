@@ -189,3 +189,7 @@ drop policy if exists expenses_admin on public.expenses;
 create policy expenses_admin on public.expenses for all using (public.is_admin()) with check (public.is_admin());
 revoke all on public.expenses from anon;
 grant select, insert, update, delete on public.expenses to authenticated;
+
+-- سجل القبض من الزبون (دفعات متعددة)
+alter table public.orders add column if not exists payments jsonb not null default '[]'::jsonb;
+alter table public.orders add column if not exists paid_iqd numeric not null default 0;
