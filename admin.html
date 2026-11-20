@@ -56,6 +56,15 @@ body{font-size:16px}
 .citem label{display:flex;gap:6px;align-items:center;font-size:.88rem}
 .citem input{width:auto}
 .hint{font-size:.8rem;color:var(--mute)}
+.owe{background:var(--accent);color:var(--accent-fg);border-radius:14px;padding:12px 16px;display:grid;gap:2px}
+.owe span{font-size:.88rem;opacity:.9}.owe b{font:700 1.6rem var(--display)}.owe small{font-size:.78rem;opacity:.85}
+.owe.ok{background:var(--ok)}
+.pays{display:grid;gap:6px}
+.pay{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:6px 12px;background:var(--card)}
+.pay .hint{flex:1}.pay button{background:none;border:0;color:var(--mute);font-size:1rem;cursor:pointer}
+.addpay{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+.addpay[open]{display:grid;gap:10px}
+.addpay summary{font:600 .95rem var(--display);color:var(--accent);cursor:pointer;padding:4px 0}
 </style>
 </head>
 <body>
@@ -163,17 +172,17 @@ function card(o){
       <div class="pv" id="pv${o.id}" data-pv="${o.id}"></div>
       <div class="row"><button class="btn" style="flex:2" type="button" data-q="${o.id}">أرسل السعر للزبون</button><button class="btn ghost" style="flex:1" type="button" data-rej="${o.id}">ارفض</button></div>`;
   }else if(o.status==="quoted"||o.status==="accepted"){
-    act=`<div class="sum"><div>المجموع<b class="num">${iqd(o.total_iqd)}</b></div><div class="me">ربحك<b class="num">${iqd(o.comm_iqd)}</b></div><div>العربون<b class="num">${iqd(o.deposit_iqd)}</b></div><div>الباقي عند الاستلام<b class="num">${iqd(o.total_iqd-o.deposit_iqd)}</b></div></div>
-      ${o.coupon_code?`<p class="hint">استعمل كوبون <b class="ltr">${esc(o.coupon_code)}</b> من تشتري بشي ان.</p>`:""}`;
-    if(o.status==="quoted")act+=`<p class="hint">⏳ انتظر الزبون يوافق على السعر.</p>`;
+    const cpn=o.coupon_code?`<p class="hint">استعمل كوبون <b class="ltr">${esc(o.coupon_code)}</b> من تشتري بشي ان.</p>`:"";
+    if(o.status==="quoted")act=`<div class="sum"><div>المجموع<b class="num">${iqd(o.total_iqd)}</b></div><div class="me">ربحك<b class="num">${iqd(o.comm_iqd)}</b></div><div>العربون<b class="num">${iqd(o.deposit_iqd)}</b></div></div>${cpn}<p class="hint">⏳ انتظر الزبون يوافق على السعر.</p>`;
     else{const pays=Array.isArray(o.payments)?o.payments:[],paid=pays.reduce((x,q)=>x+ +q.amount,0),left=Math.max(0,(+o.total_iqd||0)-paid);
-      act+=`<h4>القبض من ${esc(o.customer_name)}</h4>
-      <div class="sum"><div>المطلوب<b class="num">${iqd(o.total_iqd)}</b></div><div class="me">المقبوض<b class="num">${iqd(paid)}</b></div><div>المتبقي<b class="num">${iqd(left)}</b></div></div>
-      ${pays.length?`<div style="display:grid;gap:6px">${pays.map((q,i)=>`<div class="citem"><span><b class="num">${iqd(q.amount)}</b> <span class="hint">${esc(q.date||"")}${q.note?` · ${esc(q.note)}`:""}</span></span><button class="btn sm ghost" type="button" data-delp="${o.id}:${i}">احذف</button></div>`).join("")}</div>`:""}
-      <div class="row"><div class="field"><label for="px${o.id}">مبلغ القبض</label><input id="px${o.id}" type="number" inputmode="decimal" step="any"></div>
-        <div class="field" style="max-width:110px"><label for="pc${o.id}">العملة</label><select id="pc${o.id}"><option value="IQD">دينار</option><option value="USD">دولار</option></select></div>
-        <div class="field"><label for="pn${o.id}">ملاحظة (اختياري)</label><input id="pn${o.id}" placeholder="عربون، تحويل..."></div></div>
-      <p class="err" id="pe${o.id}"></p><button class="btn" type="button" data-pay="${o.id}">سجّل قبض</button>`}
+      act=`<div class="owe${left>0?"":" ok"}"><span>${left>0?`المتبقي على ${esc(o.customer_name)}`:"✓ مسدّد بالكامل"}</span><b class="num">${iqd(left)}</b>
+        <small>المطلوب ${iqd(o.total_iqd)} · المقبوض ${iqd(paid)} · ربحك ${iqd(o.comm_iqd)}</small></div>${cpn}
+      ${pays.length?`<div class="pays">${pays.map((q,i)=>`<div class="pay"><b class="num">${iqd(q.amount)}</b><span class="hint">${esc(q.date||"")}${q.note?` · ${esc(q.note)}`:""}</span><button type="button" data-delp="${o.id}:${i}" aria-label="احذف">✕</button></div>`).join("")}</div>`:""}
+      <details class="addpay"${pays.length?"":" open"}><summary>＋ سجّل قبض جديد</summary>
+        <div class="row"><div class="field" style="flex:2"><label for="px${o.id}">المبلغ</label><input id="px${o.id}" type="number" inputmode="decimal" step="any"></div>
+          <div class="field" style="min-width:90px"><label for="pc${o.id}">العملة</label><select id="pc${o.id}"><option value="IQD">دينار</option><option value="USD">دولار</option></select></div></div>
+        <div class="field"><label for="pn${o.id}">ملاحظة (اختياري)</label><input id="pn${o.id}" placeholder="عربون، تحويل..."></div>
+        <p class="err" id="pe${o.id}"></p><button class="btn" type="button" data-pay="${o.id}">سجّل قبض</button></details>`}
     if(o.status==="accepted")act+=`
       <h4>وين وصل الطلب؟</h4><div class="steps">${STAGES.map((s,i)=>`<button type="button" class="${i<=o.stage&&o.deposit_paid?"done":""}" data-stg="${o.id}:${i}">${s}</button>`).join("")}</div>
       <div class="row"><div class="field" style="max-width:220px"><label for="eta${o.id}">يوصل للزبون تقريباً</label><input id="eta${o.id}" type="date" data-eta="${o.id}" value="${o.eta||""}"></div></div>`;
