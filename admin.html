@@ -6,7 +6,7 @@
 <title>لوحة طلبيتي</title>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 <style>
 body{font-size:16px}
 .page{max-width:920px}
@@ -87,6 +87,7 @@ const ST={pending:"جديد، يحتاج تسعير",quoted:"انرسل السع
 const USD_AED=3.6725;
 const curPref=()=>{try{return localStorage.getItem("cur")==="USD"?"USD":"AED"}catch{return "AED"}};
 const rateShown=()=>{const r=+settings?.rate_aed||0;return curPref()==="USD"?Math.round(r*USD_AED):r};
+let adminEmail="";
 let q="",rp="month",rFrom="",rTo="",stmtPhone="";
 let orders=[],coupons=[],expenses=[],expOk=false,settings=null,filter="open",tab="orders";
 
@@ -95,10 +96,8 @@ function loginView(msg=""){
     <div class="field"><label for="em">الإيميل</label><input id="em" type="email" class="ltr" autocomplete="email"></div>
     <div class="field"><label for="pw">كلمة السر</label><input id="pw" type="password" class="ltr" autocomplete="current-password"></div>
     <p class="err" id="err">${esc(msg)}</p>
-    <button class="btn" type="button" id="in">دخول</button>
-    <button class="btn ghost" type="button" id="up">أول مرة؟ سوّي حساب</button></div>`;
+    <button class="btn" type="button" id="in">دخول</button></div>`;
   $("in").onclick=async()=>{const {error}=await db.auth.signInWithPassword({email:$("em").value.trim(),password:$("pw").value});if(error)$("err").textContent="الإيميل أو كلمة السر غلط.";else boot()};
-  $("up").onclick=async()=>{const {error}=await db.auth.signUp({email:$("em").value.trim(),password:$("pw").value});$("err").textContent=error?error.message:"انسوى الحساب. خلي المطوّر يفعّله كمدير، بعدها سجل دخول.";};
 }
 async function load(){
   const [o,c,s,e]=await Promise.all([db.from("orders").select("*").order("created_at",{ascending:false}).limit(300),db.from("coupons").select("*").order("created_at"),db.from("settings").select("*").eq("id",1).single(),db.from("expenses").select("*").order("spent_on",{ascending:false}).order("id",{ascending:false}).limit(500)]);
@@ -160,7 +159,16 @@ function view(){
       <div class="field"><label for="sWa">رقم الواتساب</label><input id="sWa" class="ltr" value="${esc(settings?.whatsapp)}"></div>
       <div class="field"><label for="sUrl">رابط شي ان</label><input id="sUrl" class="ltr" value="${esc(settings?.shein_url)}"></div>
       <p class="hint">الأسعار بشي ان الإمارات بالدرهم. إذا اخترت الدولار، الموقع يحوله للدرهم بالسعر الثابت (١ دولار = ٣.٦٧٢٥ درهم) وبعدها للدينار.</p><p class="sub" id="sMsg"></p>
-      <button class="btn" type="button" id="saveS">احفظ</button></div>`;
+      <button class="btn" type="button" id="saveS">احفظ</button></div>
+    <div class="card"><h3>حساب الدخول</h3>
+      <p class="hint">الإيميل الحالي: <b class="ltr">${esc(adminEmail)}</b></p>
+      <div class="field"><label for="aMail">إيميل جديد (اختياري)</label><input id="aMail" type="email" class="ltr" autocomplete="off"></div>
+      <div class="field"><label for="aPw">كلمة سر جديدة (٨ أحرف على الأقل)</label><input id="aPw" type="password" class="ltr" autocomplete="new-password"></div>
+      <div class="field"><label for="aPw2">أعد كتابة كلمة السر</label><input id="aPw2" type="password" class="ltr" autocomplete="new-password"></div>
+      <p class="hint">تغيير الإيميل يوصلك عليه رابط تأكيد، وما يتغير إلا بعد ما تفتحه.</p>
+      <p class="sub" id="aMsg"></p><button class="btn" type="button" id="saveA">حدّث حساب الدخول</button></div>
+    <div class="card"><h3>نسخة احتياطية</h3><p class="hint">تنزل ملفين تفتحهم بالإكسل: الطلبات والمصاريف.</p>
+      <button class="btn ghost" type="button" id="bk">⬇️ نزّل نسخة احتياطية</button></div>`;
   $("app").innerHTML=`<div class="top">${T.map(([k,l,n])=>`<button type="button" data-tab="${k}" aria-current="${tab===k}">${l}${n?`<span class="dot">${n}</span>`:""}</button>`).join("")}</div>${body}`;
   bind();
 }
@@ -302,17 +310,34 @@ function bind(){
   if($("sCur"))$("sCur").onchange=()=>{const old=curPref(),nw=$("sCur").value,v=+$("sRate").value||0;
     const aed=old==="USD"?v/USD_AED:v;try{localStorage.setItem("cur",nw)}catch{}
     $("sRate").value=nw==="USD"?Math.round(aed*USD_AED):Math.round(aed*100)/100;$("sRateL").textContent=nw==="USD"?"الدولار بكم دينار؟":"الدرهم بكم دينار؟"};
+  if($("saveA"))$("saveA").onclick=async()=>{const m=$("aMail").value.trim(),pw=$("aPw").value,pw2=$("aPw2").value,msg=$("aMsg");msg.className="err";
+    if(!m&&!pw){msg.textContent="اكتب إيميل جديد أو كلمة سر جديدة.";return}
+    if(pw&&pw.length<8){msg.textContent="كلمة السر لازم ٨ أحرف أو أكثر.";return}
+    if(pw&&pw!==pw2){msg.textContent="كلمتين السر مو متطابقتين.";return}
+    const upd={};if(m)upd.email=m;if(pw)upd.password=pw;
+    const {error}=await db.auth.updateUser(upd);
+    if(error){msg.textContent=error.message;return}
+    msg.className="sub";msg.textContent=(pw?"انغيّرت كلمة السر ✓ ":"")+(m?"وصلك رابط تأكيد على الإيميل الجديد.":"");$("aPw").value=$("aPw2").value=""};
+  if($("bk"))$("bk").onclick=()=>{const csv=(name,head,rows)=>{const e=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+      const t="\ufeff"+[head,...rows].map(r=>r.map(e).join(",")).join("\r\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv;charset=utf-8"}));a.download=name+"-"+new Date().toISOString().slice(0,10)+".csv";document.body.appendChild(a);a.click();a.remove()};
+    csv("orders",["رقم","التاريخ","الزبون","الموبايل","المحافظة","الحالة","المرحلة","المجموع","العمولة","المقبوض","المتبقي","كوبون","الرابط الأول"],orders.map(o=>[o.id,String(o.created_at).slice(0,10),o.customer_name,o.phone,o.city,ST[o.status]||o.status,STAGES[o.stage]||"",o.total_iqd,o.comm_iqd,o.paid_iqd,Math.max(0,(+o.total_iqd||0)-(+o.paid_iqd||0)),o.coupon_code,(o.items&&o.items[0]&&o.items[0].link)||""]));
+    setTimeout(()=>csv("expenses",["التاريخ","المصروف","النوع","المبلغ (دينار)"],expenses.map(e=>[e.spent_on,e.title,e.category,e.amount_iqd])),400)};
   if($("saveS"))$("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,"").replace(/^0(?=7)/,"964"),shein_url:$("sUrl").value.trim(),rate_aed:Math.round((($("sCur").value==="USD"?+$("sRate").value/USD_AED:+$("sRate").value))*10000)/10000,ship_per_kg:+$("sShip").value,commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
 }
+let unseen=0;const baseTitle=document.title;
+function newOrderAlert(o){unseen++;document.title=`(${unseen}) طلب جديد · ${baseTitle}`;
+  try{const c=new (window.AudioContext||window.webkitAudioContext)(),g=c.createGain();g.connect(c.destination);g.gain.value=.15;[880,1175].forEach((f,i)=>{const x=c.createOscillator();x.frequency.value=f;x.connect(g);x.start(c.currentTime+i*.18);x.stop(c.currentTime+i*.18+.16)})}catch{}
+  const b=document.createElement("div");b.className="toast";b.style.cssText="position:fixed;top:64px;inset-inline:16px;z-index:20;text-align:center;font-weight:700";b.textContent=`🔔 طلب جديد من ${o&&o.customer_name||"زبون"}`;document.body.appendChild(b);setTimeout(()=>b.remove(),6000)}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){unseen=0;document.title=baseTitle}});
 async function boot(){
   if(!db){$("app").innerHTML=`<p class="err">الموقع بعده مو مربوط بقاعدة البيانات.</p>`;return}
   const {data:{session}}=await db.auth.getSession();
   if(!session){$("logout").hidden=true;loginView();return}
   const {data:adm}=await db.from("admins").select("user_id").eq("user_id",session.user.id).maybeSingle();
   if(!adm){loginView("هذا الحساب مو مفعّل كمدير بعد.");return}
-  $("logout").hidden=false;$("logout").onclick=async()=>{await db.auth.signOut();boot()};
+  adminEmail=session.user.email||"";$("logout").hidden=false;$("logout").onclick=async()=>{await db.auth.signOut();boot()};
   await load();view();
-  db.channel("orders").on("postgres_changes",{event:"*",schema:"public",table:"orders"},async()=>{await load();view()}).subscribe();
+  db.channel("orders").on("postgres_changes",{event:"*",schema:"public",table:"orders"},async(e)=>{await load();view();if(e.eventType==="INSERT")newOrderAlert(e.new)}).subscribe();
 }
 boot();
 </script>
