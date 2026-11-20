@@ -107,7 +107,7 @@ function view(){
   else if(tab==="expenses"){
     let inc=0;orders.forEach(o=>{if(o.status==="accepted")inc+=(+o.comm_iqd||0)+(+o.ship_iqd||0)+(+o.delivery_iqd||0)});
     const tot=expenses.reduce((x,e)=>x+ +e.amount_iqd,0),net=inc-tot;
-    const cats=["شحن","توصيل","أخرى"],by=c=>expenses.filter(e=>e.category===c).reduce((x,e)=>x+ +e.amount_iqd,0);
+    const cats=[...new Set(["شحن","توصيل","أخرى",...expenses.map(e=>e.category)])],by=c=>expenses.filter(e=>e.category===c).reduce((x,e)=>x+ +e.amount_iqd,0);
     body=!expOk?`<div class="card"><h3>المصاريف</h3><p class="hint">هذا التبويب بعده مو مفعّل (جدول المصاريف مو مضاف بقاعدة البيانات). المطوّر يفعّله وبعدها يشتغل.</p></div>`:`
     <div class="kpis">
       <div class="kpi hi"><span>ربحك الصافي</span><b class="num">${iqd(net)}</b></div>
@@ -116,8 +116,11 @@ function view(){
     <p class="hint">الصافي = عمولتك + الشحن والتوصيل اللي أخذتهم من الزبايين − مصاريفك. ${cats.map(c=>`${c}: ${iqd(by(c))}`).join(" · ")}</p>
     <div class="card"><h3>سجّل مصروف</h3>
       <div class="row"><div class="field" style="flex:2"><label for="xTitle">شنو المصروف؟</label><input id="xTitle" placeholder="مثلاً: شحنة الأسبوع"></div>
-        <div class="field"><label for="xCat">النوع</label><select id="xCat">${cats.map(c=>`<option>${c}</option>`).join("")}</select></div></div>
-      <div class="row"><div class="field"><label for="xAmt">المبلغ (دينار)</label><input id="xAmt" type="number" inputmode="numeric"></div>
+        <div class="field"><label for="xCat">النوع (اختار أو اكتب نوع جديد)</label><input id="xCat" list="xCats" value="${esc(cats[0])}" autocomplete="off"><datalist id="xCats">${cats.map(c=>`<option value="${esc(c)}">`).join("")}</datalist></div></div>
+      <div class="row"><div class="field"><label for="xAmt">المبلغ</label><input id="xAmt" type="number" inputmode="decimal" step="any"></div>
+        <div class="field" style="max-width:130px"><label for="xCur">العملة</label><select id="xCur"><option value="IQD">دينار</option><option value="USD">دولار</option></select></div></div>
+      <p class="hint" id="xConv"></p>
+      <div class="row">
         <div class="field"><label for="xDate">التاريخ</label><input id="xDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div></div>
       <p class="err" id="xErr"></p><button class="btn" type="button" id="addX">أضف المصروف</button></div>
     ${expenses.length?`<div class="card"><h3>المصاريف المسجلة</h3>${expenses.map(e=>`<div class="citem"><span><b>${esc(e.title)}</b> <span class="pill new">${esc(e.category)}</span><br><span class="hint">${esc(e.spent_on)}</span></span><span style="display:flex;gap:10px;align-items:center"><b class="num">${iqd(e.amount_iqd)}</b><button class="btn sm ghost" type="button" data-delx="${e.id}">احذف</button></span></div>`).join("")}</div>`:`<p class="empty">ماكو مصاريف مسجلة.</p>`}`;
@@ -190,8 +193,13 @@ function bind(){
   A.querySelectorAll("[data-stg]").forEach(x=>x.onclick=async()=>{const [id,st]=x.dataset.stg.split(":").map(Number);await db.from("orders").update({stage:st}).eq("id",id);await load();view()});
   A.querySelectorAll("[data-on]").forEach(x=>x.onchange=async()=>{await db.from("coupons").update({active:x.checked}).eq("id",+x.dataset.on);await load();view()});
   A.querySelectorAll("[data-del]").forEach(x=>x.onclick=async()=>{await db.from("coupons").delete().eq("id",+x.dataset.del);await load();view()});
-  if($("addX"))$("addX").onclick=async()=>{const t=$("xTitle").value.trim(),a=+$("xAmt").value;if(!t||!(a>0)){$("xErr").textContent="اكتب اسم المصروف والمبلغ.";return}
-    const {error}=await db.from("expenses").insert({title:t,category:$("xCat").value,amount_iqd:a,spent_on:$("xDate").value||undefined});if(error){$("xErr").textContent=error.message;return}await load();view()};
+  const usdRate=()=>(+settings?.rate_aed||0)*USD_AED;
+  const xIqd=()=>{const a=+$("xAmt").value||0;return $("xCur").value==="USD"?Math.round(a*usdRate()):Math.round(a)};
+  const xConv=()=>{$("xConv").textContent=$("xCur").value==="USD"&&+$("xAmt").value>0?`= ${iqd(xIqd())} (على سعر الدولار ${iqd(usdRate())} من الإعدادات)`:""};
+  if($("xAmt")){$("xAmt").oninput=xConv;$("xCur").onchange=xConv}
+  if($("addX"))$("addX").onclick=async()=>{let t=$("xTitle").value.trim();const a=xIqd(),cat=$("xCat").value.trim()||"أخرى";if(!t||!(a>0)){$("xErr").textContent="اكتب اسم المصروف والمبلغ.";return}
+    if($("xCur").value==="USD")t+=` (${+$("xAmt").value}$)`;
+    const {error}=await db.from("expenses").insert({title:t,category:cat,amount_iqd:a,spent_on:$("xDate").value||undefined});if(error){$("xErr").textContent=error.message;return}await load();view()};
   A.querySelectorAll("[data-delx]").forEach(x=>x.onclick=async()=>{if(!confirm("تحذف هذا المصروف؟"))return;await db.from("expenses").delete().eq("id",+x.dataset.delx);await load();view()});
   if($("addC"))$("addC").onclick=async()=>{const code=$("nCode").value.trim().toUpperCase();if(!code)return;await db.from("coupons").insert({code,pct:+$("nPct").value,min_aed:+$("nMin").value||0});await load();view()};
   if($("sCur"))$("sCur").onchange=()=>{const old=curPref(),nw=$("sCur").value,v=+$("sRate").value||0;
