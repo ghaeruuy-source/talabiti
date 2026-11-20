@@ -6,7 +6,7 @@
 <title>لوحة طلبيتي</title>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 <style>
 body{font-size:16px}
 .page{max-width:920px}
@@ -56,6 +56,9 @@ body{font-size:16px}
 .citem label{display:flex;gap:6px;align-items:center;font-size:.88rem}
 .citem input{width:auto}
 .hint{font-size:.8rem;color:var(--mute)}
+.stl{border-bottom:1px dashed var(--line);padding:6px 0;display:grid;gap:2px}
+.q{display:flex;justify-content:space-between;gap:8px;align-items:center}
+@media print{body *{visibility:hidden}.stmt,.stmt *{visibility:visible}.stmt{position:absolute;inset:0 0 auto 0;border:0}.no-print{display:none!important}}
 .owe{background:var(--accent);color:var(--accent-fg);border-radius:14px;padding:12px 16px;display:grid;gap:2px}
 .owe span{font-size:.88rem;opacity:.9}.owe b{font:700 1.6rem var(--display)}.owe small{font-size:.78rem;opacity:.85}
 .owe.ok{background:var(--ok)}
@@ -84,7 +87,7 @@ const ST={pending:"جديد، يحتاج تسعير",quoted:"انرسل السع
 const USD_AED=3.6725;
 const curPref=()=>{try{return localStorage.getItem("cur")==="USD"?"USD":"AED"}catch{return "AED"}};
 const rateShown=()=>{const r=+settings?.rate_aed||0;return curPref()==="USD"?Math.round(r*USD_AED):r};
-let q="";
+let q="",rp="month",rFrom="",rTo="",stmtPhone="";
 let orders=[],coupons=[],expenses=[],expOk=false,settings=null,filter="open",tab="orders";
 
 function loginView(msg=""){
@@ -106,7 +109,7 @@ function view(){
   orders.forEach(o=>{if(o.status==="pending")pend++;if(o.status==="accepted"){sales+=+o.total_iqd;profit+=+o.comm_iqd}});
   const qq=q.trim().toLowerCase();
   const list=orders.filter(o=>!qq||(o.customer_name+" "+o.phone+" #"+o.id).toLowerCase().includes(qq)).filter(o=>filter==="all"||(filter==="open"?["pending","quoted"].includes(o.status)||(o.status==="accepted"&&o.stage<4):filter==="done"?o.status==="accepted"&&o.stage>=4:o.status===filter));
-  const T=[["orders","الطلبات",pend],["expenses","المصاريف",0],["settings","الإعدادات",0]];
+  const T=[["orders","الطلبات",pend],["expenses","المصاريف",0],["reports","التقارير",0],["settings","الإعدادات",0]];
   let body="";
   if(tab==="orders")body=`
     <div class="kpis">
@@ -116,6 +119,7 @@ function view(){
     <input id="q" type="search" placeholder="🔍 دور باسم الزبون أو رقمه" value="${esc(q)}">
     <div class="filters">${[["open","المفتوحة"],["pending","تحتاج تسعير"],["quoted","بانتظار الزبون"],["accepted","مأكدة"],["done","تسلّمت"],["all","الكل"]].map(([k,l])=>`<button type="button" class="chip" aria-pressed="${filter===k}" data-f="${k}">${l}</button>`).join("")}</div>
     ${list.length?list.map(card).join(""):`<p class="empty">ماكو طلبات هنا.</p>`}`;
+  else if(tab==="reports")body=reportsHTML();
   else if(tab==="expenses"){
     let inc=0;orders.forEach(o=>{if(o.status==="accepted")inc+=(+o.comm_iqd||0)+(+o.ship_iqd||0)+(+o.delivery_iqd||0)});
     const tot=expenses.reduce((x,e)=>x+ +e.amount_iqd,0),net=inc-tot;
@@ -160,6 +164,60 @@ function view(){
   $("app").innerHTML=`<div class="top">${T.map(([k,l,n])=>`<button type="button" data-tab="${k}" aria-current="${tab===k}">${l}${n?`<span class="dot">${n}</span>`:""}</button>`).join("")}</div>${body}`;
   bind();
 }
+
+function dstr(d){return new Date(d).toISOString().slice(0,10)}
+function range(){const now=new Date(),t=dstr(now);
+  if(rp==="today")return[t,t];
+  if(rp==="week"){const d=new Date(now);d.setDate(d.getDate()-6);return[dstr(d),t]}
+  if(rp==="month")return[t.slice(0,8)+"01",t];
+  if(rp==="custom")return[rFrom||"0000-00-00",rTo||"9999-12-31"];
+  return["0000-00-00","9999-12-31"]}
+function reportsHTML(){
+  const [a,b]=range();
+  const os=orders.filter(o=>o.status==="accepted"&&dstr(o.accepted_at||o.created_at)>=a&&dstr(o.accepted_at||o.created_at)<=b);
+  const ex=expenses.filter(e=>e.spent_on>=a&&e.spent_on<=b);
+  const sum=(arr,f)=>arr.reduce((x,o)=>x+(+f(o)||0),0);
+  const sales=sum(os,o=>o.total_iqd),goods=sum(os,o=>o.goods_iqd),comm=sum(os,o=>o.comm_iqd),ship=sum(os,o=>o.ship_iqd)+sum(os,o=>o.delivery_iqd),exp=sum(ex,e=>e.amount_iqd);
+  const paid=sum(os,o=>o.paid_iqd),net=comm+ship-exp;
+  const by={};os.forEach(o=>{const k=o.phone;(by[k]=by[k]||{name:o.customer_name,phone:o.phone,n:0,sales:0,comm:0}).n++;by[k].sales+=+o.total_iqd||0;by[k].comm+=+o.comm_iqd||0});
+  const top=Object.values(by).sort((x,y)=>y.sales-x.sales).slice(0,10);
+  const lbl={today:"اليوم",week:"آخر ٧ أيام",month:"هذا الشهر",all:"الكل",custom:"فترة محددة"}[rp];
+  window.__report=`📊 تقرير ${lbl}${rp==="custom"?` (${a} → ${b})`:""}\nالطلبات المأكدة: ${os.length}\nالمبيعات: ${iqd(sales)}\nبضاعة شي ان: ${iqd(goods)}\nعمولتك: ${iqd(comm)}\nشحن وتوصيل مأخوذ: ${iqd(ship)}\nالمصاريف: ${iqd(exp)}\nالربح الصافي: ${iqd(net)}\nالمقبوض فعلاً: ${iqd(paid)}\nالمتبقي عند الزبايين: ${iqd(sales-paid)}`;
+  const custs={};orders.filter(o=>o.status==="accepted").forEach(o=>custs[o.phone]=o.customer_name);
+  return `
+  <div class="filters">${[["today","اليوم"],["week","آخر ٧ أيام"],["month","هذا الشهر"],["all","الكل"],["custom","فترة محددة"]].map(([k,l])=>`<button type="button" class="chip" aria-pressed="${rp===k}" data-rp="${k}">${l}</button>`).join("")}</div>
+  ${rp==="custom"?`<div class="row"><div class="field"><label for="rF">من</label><input id="rF" type="date" value="${esc(rFrom)}"></div><div class="field"><label for="rT">إلى</label><input id="rT" type="date" value="${esc(rTo)}"></div></div>`:""}
+  <div class="kpis"><div class="kpi hi"><span>الربح الصافي</span><b class="num">${iqd(net)}</b></div><div class="kpi"><span>المبيعات</span><b class="num">${iqd(sales)}</b></div><div class="kpi"><span>الطلبات</span><b class="num">${os.length}</b></div></div>
+  <div class="card"><h3>تفصيل الأرباح</h3>
+    <div class="q"><span>عمولتك</span><b class="num">${iqd(comm)}</b></div>
+    <div class="q"><span>+ شحن وتوصيل أخذته من الزبايين</span><b class="num">${iqd(ship)}</b></div>
+    <div class="q d"><span>− مصاريفك</span><b class="num">${iqd(exp)}</b></div>
+    <div class="q t"><span>= الربح الصافي</span><b class="num">${iqd(net)}</b></div>
+    <p class="hint">بضاعة شي ان اللي دفعتها: ${iqd(goods)} · المقبوض فعلاً من الزبايين: ${iqd(paid)} · المتبقي عندهم: ${iqd(Math.max(0,sales-paid))}</p>
+    <button class="btn sm ghost" type="button" id="cpRep">📋 انسخ التقرير</button></div>
+  ${top.length?`<div class="card"><h3>أحسن الزبايين</h3>${top.map(c=>`<div class="citem"><span><b>${esc(c.name)}</b> <span class="hint">${c.n} طلب</span></span><span><b class="num">${iqd(c.sales)}</b> <span class="hint">ربحك ${iqd(c.comm)}</span></span></div>`).join("")}</div>`:""}
+  <div class="card"><h3>كشف حساب زبون</h3>
+    <div class="field"><label for="stSel">اختار الزبون</label><select id="stSel"><option value="">—</option>${Object.entries(custs).map(([ph,nm])=>`<option value="${esc(ph)}"${ph===stmtPhone?" selected":""}>${esc(nm)} · ${esc(ph)}</option>`).join("")}</select></div></div>
+  ${stmtPhone?stmtHTML(stmtPhone):""}`;
+}
+function stmtHTML(ph){
+  const os=orders.filter(o=>o.phone===ph&&o.status==="accepted").sort((x,y)=>new Date(x.created_at)-new Date(y.created_at));
+  if(!os.length)return"";
+  const nm=os[0].customer_name,tot=os.reduce((x,o)=>x+(+o.total_iqd||0),0),paid=os.reduce((x,o)=>x+(+o.paid_iqd||0),0),left=Math.max(0,tot-paid);
+  const sh=settings?.shop_name||"طلبيتي";
+  const d=x=>new Date(x).toLocaleDateString("ar-IQ",{day:"numeric",month:"short",year:"numeric"});
+  let txt=`🧾 كشف حساب — ${sh}\nالزبون: ${nm} (${ph})\nالتاريخ: ${d(new Date())}\n`;
+  os.forEach(o=>{txt+=`\nطلب #${o.id} (${d(o.created_at)}): ${iqd(o.total_iqd)}\n`;(o.payments||[]).forEach(q=>{txt+=`  • قبض ${iqd(q.amount)} — ${q.date||""}${q.note?` (${q.note})`:""}\n`});txt+=`  المتبقي: ${iqd(Math.max(0,o.total_iqd-(o.paid_iqd||0)))}\n`});
+  txt+=`\nالمجموع: ${iqd(tot)}\nالمقبوض: ${iqd(paid)}\nالمتبقي: ${iqd(left)}`;
+  window.__stmt=txt;
+  return `<div class="card stmt"><h3>🧾 كشف حساب — ${esc(sh)}</h3>
+    <p class="sub">${esc(nm)} · <span class="ltr">${esc(ph)}</span> · ${d(new Date())}</p>
+    ${os.map(o=>{const pl=Array.isArray(o.payments)?o.payments:[];return `<div class="stl"><div class="q"><b>طلب #${o.id}</b><span class="hint">${d(o.created_at)}</span><b class="num">${iqd(o.total_iqd)}</b></div>
+      ${pl.map(q=>`<div class="q hint"><span>قبض · ${esc(q.date||"")}${q.note?` · ${esc(q.note)}`:""}</span><span class="num">${iqd(q.amount)}</span></div>`).join("")}
+      <div class="q"><span>المتبقي</span><b class="num">${iqd(Math.max(0,o.total_iqd-(o.paid_iqd||0)))}</b></div></div>`}).join("")}
+    <div class="owe${left>0?"":" ok"}"><span>${left>0?"المتبقي على الزبون":"✓ مسدّد بالكامل"}</span><b class="num">${iqd(left)}</b><small>المجموع ${iqd(tot)} · المقبوض ${iqd(paid)}</small></div>
+    <div class="row no-print"><button class="btn sm" type="button" id="stCopy">📋 انسخ</button><a class="btn sm ghost" target="_blank" rel="noopener" href="https://wa.me/${esc(ph.replace(/^0/,"964"))}?text=${encodeURIComponent(txt)}">واتساب للزبون</a><button class="btn sm ghost" type="button" id="stPrint">🖨️ طباعة / PDF</button></div></div>`;
+}
 function card(o){
   const items=o.items.map(i=>i.basket
     ?`<div class="basket"><span><b>🛍️ ${esc(i.name)}</b><br><span class="hint">افتح السلة، شوف المجموع بعد الخصم واكتبه تحت.</span></span><a class="btn sm" href="${esc(i.link)}" target="_blank" rel="noopener">افتح السلة</a></div>`
@@ -192,11 +250,20 @@ function card(o){
   return`<div class="ao${o.status==="pending"?" pending":""}">
     <div class="ao-h"><b>#${o.id} · ${esc(o.customer_name)}</b><span class="pill ${pill[0]}">${pill[1]}</span></div>
     <div class="ao-c"><span>📍 ${esc(o.city)}${o.address?` · ${esc(o.address)}`:""}</span><a class="wa ltr" href="https://wa.me/${esc(tel)}" target="_blank" rel="noopener">واتساب ${esc(o.phone)}</a><span>${new Date(o.created_at).toLocaleString("ar-IQ",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}</span>${o.note?`<span>📝 ${esc(o.note)}</span>`:""}</div>
-    <div class="ao-i">${items}</div>${act?`<div class="ao-a">${act}</div>`:""}</div>`;
+    <div class="ao-i">${items}</div>${o.status==="accepted"?`<div class="ao-a" style="padding-block:6px"><button class="btn sm ghost" type="button" data-stmt="${esc(o.phone)}">📄 كشف حساب ${esc(o.customer_name)}</button></div>`:""}${act?`<div class="ao-a">${act}</div>`:""}</div>`;
 }
 function bind(){
   const A=$("app");
   A.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;view()});
+  A.querySelectorAll("[data-rp]").forEach(b=>b.onclick=()=>{rp=b.dataset.rp;view()});
+  if($("rF"))$("rF").onchange=e=>{rFrom=e.target.value;view()};
+  if($("rT"))$("rT").onchange=e=>{rTo=e.target.value;view()};
+  if($("stSel"))$("stSel").onchange=e=>{stmtPhone=e.target.value;view()};
+  A.querySelectorAll("[data-stmt]").forEach(b=>b.onclick=()=>{stmtPhone=b.dataset.stmt;tab="reports";view();window.scrollTo(0,0)});
+  const cp=async(t,btn)=>{try{await navigator.clipboard.writeText(t);const o=btn.textContent;btn.textContent="اننسخ ✓";setTimeout(()=>btn.textContent=o,1500)}catch{prompt("انسخ من هنا:",t)}};
+  if($("cpRep"))$("cpRep").onclick=e=>cp(window.__report,e.target);
+  if($("stCopy"))$("stCopy").onclick=e=>cp(window.__stmt,e.target);
+  if($("stPrint"))$("stPrint").onclick=()=>window.print();
   if($("q"))$("q").oninput=e=>{q=e.target.value;const pos=e.target.selectionStart;view();const n=$("q");n.focus();n.setSelectionRange(pos,pos)};
   A.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filter=b.dataset.f;view()});
   const preview=id=>{const S=settings,el=$("pv"+id);if(!S||!el)return;const sale=+$("sa"+id).value||0,kg=+$("k"+id).value||0;
