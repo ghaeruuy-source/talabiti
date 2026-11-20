@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>لمّة</title>
+<meta name="description" content="لمّي صديقاتج، اطلبن سوا من شي ان، والشحن ينزل لحد ما يصير مجاني.">
+<meta name="theme-color" content="#5A2A82">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&display=swap">
+<link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+<div class="wrap"><header class="top"><a class="logo" href="./"><i>ل</i>لمّة</a><span class="sub">شراء جماعي من شي ان</span></header>
+<main id="view" aria-live="polite"></main></div>
+<nav class="tabs" aria-label="أقسام"><a data-go data-t="home" href="./">🏠 الرئيسية</a><a data-go data-t="orders" href="?orders">📦 طلباتي</a></nav>
+<script src="config.js"></script>
+<script src="supabase.js"></script>
+<script src="lamma.js"></script>
+<script>
+const COLORS=["#FF5E3A","#5A2A82","#1FA97A","#E0A100","#E2457A","#2F7FD8"];
+let me=store.get("me",{name:"",phone:"",city:"",address:""}),mine=store.get("mine",[]);
+let items=[{link:"",name:"",sale:"",size:"",qty:1}];
+const shareUrl=c=>location.origin+location.pathname+"?l="+c;
+function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2200)}
+function nav(cur){document.querySelectorAll("nav.tabs a").forEach(a=>a.setAttribute("aria-current",a.dataset.t===cur))}
+function route(){const q=new URLSearchParams(location.search),c=q.get("l");
+  if(c){nav("");return showLamma(c.toUpperCase())}
+  if(q.has("orders")){nav("orders");return showOrders()}
+  nav("home");home()}
+function go(url){history.pushState(null,"",url);route();scrollTo(0,0)}
+document.addEventListener("click",e=>{const a=e.target.closest("a[data-go]");if(a){e.preventDefault();go(a.getAttribute("href"))}});
+
+function home(){
+  const T=tiers();
+  $("view").innerHTML=`
+  <section class="hero"><h1>ليش تدفعين شحن <em>وحدج؟</em><br>لمّي البنات ونزّلي السعر</h1>
+    <p>افتحي لمّة، دزّي الرابط لصديقاتج، وكل وحدة تلصق سلتها من شي ان. كل ما يكبر مجموع اللمّة ينزل الشحن على الكل، لحد ما يصير مجاني.</p></section>
+  <div class="steps"><div><b>١</b>افتحي لمّة</div><div><b>٢</b>دزّي الرابط</div><div><b>٣</b>الشحن ينزل</div></div>
+  <form class="card tilt" id="cf"><h3 style="font-size:1.4rem">افتحي لمّتج</h3>
+    <div class="field"><label for="t">اسم اللمّة</label><input id="t" required maxlength="40" placeholder="مثلاً: لمّة بنات الكلية"></div>
+    <div class="two"><div class="field"><label for="n">اسمج</label><input id="n" required value="${esc(me.name)}"></div>
+      <div class="field"><label for="c">المحافظة</label><input id="c" required value="${esc(me.city)}" placeholder="بغداد"></div></div>
+    <div class="field"><label for="p">رقم الموبايل (يشوفه الأدمن بس)</label><input id="p" class="ltr" inputmode="tel" required value="${esc(me.phone)}" placeholder="07xx xxx xxxx"></div>
+    <p class="err" id="ce"></p><button class="btn" type="submit">افتحي اللمّة ✨</button>
+    <p class="sub">اللمّة تبقى مفتوحة ${+S.lamma_hours} ساعة، بعدها تنقفل ونطلب الكل سوا.</p></form>
+  <div class="card"><h3>شلون ينزل الشحن؟</h3>
+    ${T.map(t=>`<div class="person"><div class="av" style="background:${t.pct<100?"var(--grape)":"var(--mint)"}">${t.pct?t.pct+"٪":"—"}</div><div class="n"><b>${t.label}</b><div class="sub">${t.at?"لمّة فوق "+iqd(t.at):"أي مبلغ"}</div></div><b class="num">${t.pct===100?"مجاني":t.pct?"خصم "+t.pct+"%":"كامل"}</b></div>`).join("")}
+    <p class="sub">كل وحدة تختار شحن جوي أو بحري، والخصم ينطبق على شحنها.</p></div>
+  ${mine.length?`<div class="card mylist"><h3>لمّاتي</h3>${mine.map(m=>`<a data-go href="?l=${esc(m.code)}"><span>${esc(m.title)}</span><span class="sub ltr">${esc(m.code)}</span></a>`).join("")}</div>`:""}`;
+  $("cf").onsubmit=async e=>{e.preventDefault();const f={title:$("t").value.trim(),name:$("n").value.trim(),phone:$("p").value,city:$("c").value.trim()};
+    if(!/^07\d{9}$/.test(normPhone(f.phone)))return $("ce").textContent="رقم الموبايل لازم يبدي بـ07 و11 رقم.";
+    const b=e.submitter;b.disabled=true;
+    try{const code=await api.create(f);me={...me,name:f.name,phone:normPhone(f.phone),city:f.city};store.set("me",me);mine.unshift({code,title:f.title});store.set("mine",mine);
+      history.pushState(null,"","?l="+code);showLamma(code,true)}catch(x){$("ce").textContent=err(x);b.disabled=false}};
+}
+
+async function showLamma(code,fresh){
+  let l;try{l=await api.get(code,me.phone)}catch{l=null}
+  if(l&&!mine.some(m=>m.code===code)&&l.members.some(m=>m.mine)){mine.unshift({code,title:l.title});store.set("mine",mine)}
+  if(!l){$("view").innerHTML=`<div class="card"><h3>ما لگينا هاللمّة</h3><p class="sub">تأكدي من الرابط.</p><a class="btn" href="./">افتحي لمّة جديدة</a></div>`;return}
+  const total=groupTotal(l.members),t=l.ship_off_pct!=null?tiers().find(x=>x.pct==l.ship_off_pct)||tierOf(total):tierOf(total),nx=nextTier(total),max=+S.lamma_free_at;
+  const pct=Math.min(100,total/max*100),open=l.status==="open"&&new Date(l.closes_at)>Date.now();
+  const saved=(S.ship_per_kg-shipEst(t.pct))*l.members.length;
+  const msg=`لمّة "${l.title}" بشي ان 🛍️ ضيفي قطعج وياي حتى ينزل الشحن علينا كلنا${nx?`، باقي ${iqd(nx.at-total)} ويصير ${nx.label}`:""}: ${shareUrl(code)}`;
+  $("view").innerHTML=`
+  <section class="lhead"><div class="meta"><span class="tag">${esc(l.city)}</span><span class="tag">صاحبة اللمّة: ${esc(l.owner_name)}</span><span class="tag ${open?"hot":""}">${open?"⏳ باقي "+timeLeft(l):"🔒 مقفولة"}</span></div>
+    <h2>${esc(l.title)}</h2>
+    <div><span class="sub" style="color:#fff;opacity:.8">مجموع اللمّة</span><div class="big num">${iqd(total)}</div></div>
+    <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${total}"><div class="fill" style="width:${pct}%"></div>
+      ${tiers().slice(1).map(x=>`<div class="mk ${total>=x.at?"on":""}" style="right:${x.at/max*100}%">${x.pct<100?"½":"★"}<span>${x.label}</span></div>`).join("")}</div>
+    <div class="goal">${nx?`باقي <b class="num">${iqd(nx.at-total)}</b> ويصير <b>${nx.label}</b> للكل`:`<b>وصلتن! الشحن مجاني للكل 🎉</b>`}<br><span style="opacity:.85">${t.pct?`خصم <b>${t.pct}%</b> على شحن كل وحدة`:"الشحن بسعره العادي لحد هسه"}</span></div>
+  </section>
+  ${fresh?`<div class="save">انفتحت لمّتج! هسه دزّي الرابط للبنات 👇</div>`:""}
+  <div class="share"><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">دزّيها بالواتساب</a><button class="btn ghost" type="button" id="cp">انسخي الرابط</button></div>
+  <div class="card"><h3>البنات باللمّة (${l.members.length})</h3>
+    ${l.members.length?`<div class="people">${l.members.map((m,i)=>`<div class="person"><div class="av" style="background:${COLORS[i%COLORS.length]}">${esc(m.name.trim()[0]||"؟")}</div><div class="n"><b>${esc(m.name)}</b>${m.mine?`<span class="me">إنتِ</span>`:""}<div class="sub">${m.n} قطعة</div></div><b class="num">${iqd(toIqd(m.sale_aed))}</b></div>`).join("")}</div>`:`<p class="sub">بعد محد ضاف. كوني أول وحدة!</p>`}
+    ${saved>0?`<div class="save">اللمّة موفّرة على البنات تقريباً <span class="num">${iqd(saved)}</span> شحن</div>`:""}</div>
+  ${open?joinForm():`<div class="card"><h3>اللمّة انقفلت 🔒</h3><p class="sub">${l.status==="locked"?"طلب كل وحدة انرسل للتسعير. السعر النهائي بالدينار يطلعلج بـ«طلباتي».":"هاللمّة ما مفتوحة."}</p>${l.members.some(m=>m.mine)?`<a class="btn" data-go href="?orders">شوفي طلبي</a>`:`<a class="btn" data-go href="./">افتحي لمّة جديدة</a>`}</div>`}`;
+  $("cp").onclick=async()=>{try{await navigator.clipboard.writeText(shareUrl(code));toast("انسخ الرابط ✓")}catch{prompt("انسخي الرابط:",shareUrl(code))}};
+  if(open)bindJoin(code,l.title);
+}
+
+let mode="cart",bk={link:"",total:"",count:""},shipMode=store.get("ship","air");
+function joinForm(){const B=mode==="cart";return `<form class="card tilt" id="jf"><h3 style="font-size:1.4rem">ضيفي قطعج</h3>
+  <div class="two"><div class="field"><label for="jn">اسمج</label><input id="jn" required value="${esc(me.name)}"></div>
+    <div class="field"><label for="jp">رقم الموبايل</label><input id="jp" class="ltr" inputmode="tel" required value="${esc(me.phone)}" placeholder="07xx"></div></div>
+  <div class="field"><label for="ja">المنطقة / أقرب نقطة دالة</label><input id="ja" value="${esc(me.address)}" placeholder="مثلاً: المنصور، قرب جامع..."></div>
+  <div class="two"><button type="button" class="btn sm ${B?"":"ghost"}" style="width:100%" id="mCart">🛍️ سلتي كاملة</button><button type="button" class="btn sm ${B?"ghost":""}" style="width:100%" id="mItem">قطعة قطعة</button></div>
+  ${B?`<div class="item"><p class="sub">بتطبيق شي ان افتحي السلة ← زر المشاركة ↗ ← نسخ الرابط، والصقيه هنا.</p>
+    <div class="field"><label for="bl">رابط السلة</label><input id="bl" class="ltr" inputmode="url" value="${esc(bk.link)}" placeholder="الصقي الرابط هنا"></div>
+    <button class="btn ghost sm" type="button" id="paste" style="width:100%">📋 الصقي من الحافظة</button>
+    <div class="two"><div class="field"><label for="bt">مجموع السلة ($ دولار)</label><input id="bt" class="ltr" inputmode="decimal" value="${esc(bk.total)}" placeholder="$ 65"></div>
+      <div class="field"><label for="bc">كم قطعة؟</label><input id="bc" type="number" min="1" max="100" inputmode="numeric" value="${esc(bk.count)}" placeholder="4"></div></div>
+    <p class="sub">المجموع بالدولار تلگينه أسفل السلة بشي ان بعد الخصم. نتأكد منه إحنا لما تنقفل اللمّة.</p></div>`
+  :`<div id="its" style="display:grid;gap:10px">${items.map((it,i)=>`<div class="item">
+    <div class="field"><label>رابط القطعة من شي ان</label><input class="ltr" data-i="${i}" data-k="link" inputmode="url" value="${esc(it.link)}" placeholder="https://ar.shein.com/..."></div>
+    <div class="three"><div class="field"><label>اسم القطعة</label><input data-i="${i}" data-k="name" value="${esc(it.name)}" placeholder="فستان ورد"></div>
+      <div class="field"><label>السعر $</label><input data-i="${i}" data-k="sale" class="ltr" inputmode="decimal" value="${esc(it.sale)}" placeholder="$"></div>
+      <div class="field"><label>القياس</label><input data-i="${i}" data-k="size" value="${esc(it.size)}" placeholder="M"></div></div>
+    ${items.length>1?`<button class="x" type="button" data-rm="${i}">✕ شيلي هالقطعة</button>`:""}</div>`).join("")}</div>
+  <button class="btn ghost sm" type="button" id="more">＋ قطعة ثانية</button>`}
+  <div class="field"><label>طريقة الشحن</label><div class="two">
+    <button type="button" class="opt" data-ship="air" aria-pressed="${shipMode==="air"}">✈️ جوي<small>أسرع</small></button>
+    <button type="button" class="opt" data-ship="sea" aria-pressed="${shipMode==="sea"}">🚢 بحري<small>أرخص وياخذ وقت أكثر</small></button></div>
+    <p class="sub">خصم اللمّة ينطبق على الاثنين.</p></div>
+  <p class="sub" id="est"></p><p class="err" id="je"></p>
+  <button class="btn" type="submit">ضيفيني للّمّة</button>
+  <p class="sub">ما تدفعين شي هسه. لما تنقفل اللمّة يوصلج السعر النهائي بالدينار وتوافقين عليه.</p></form>`}
+
+function bindJoin(code,title){
+  const keep=()=>{me={...me,name:$("jn").value,phone:$("jp").value,address:$("ja").value};if($("bl"))bk={link:$("bl").value,total:$("bt").value,count:$("bc").value}};
+  const upd=()=>{const s=mode==="cart"?(parseFloat($("bt").value)||0):items.reduce((a,i)=>a+(+i.sale||0)*i.qty,0);$("est").innerHTML=s?`قطعج تقريباً <b class="num">${iqd(toIqd(s*USD_AED))}</b> <span class="est">تقديري</span>`:""};
+  document.querySelectorAll("[data-ship]").forEach(b=>b.onclick=()=>{shipMode=b.dataset.ship;store.set("ship",shipMode);document.querySelectorAll("[data-ship]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+  $("mCart").onclick=()=>{keep();mode="cart";showLamma(code)};$("mItem").onclick=()=>{keep();mode="item";showLamma(code)};
+  if(mode==="cart"){$("bt").oninput=upd;
+    $("paste").onclick=async()=>{try{const t=await navigator.clipboard.readText(),u=t.match(/https?:\/\/\S+/);$("bl").value=u?u[0]:t}catch{$("je").textContent="المتصفح ما سمح. اضغطي مطولاً بالخانة واختاري لصق."}}}
+  else{$("its").oninput=e=>{const d=e.target.dataset;if(d.k){items[d.i][d.k]=e.target.value;upd()}};
+    $("its").onclick=e=>{if(e.target.dataset.rm!=null){keep();items.splice(+e.target.dataset.rm,1);showLamma(code)}};
+    $("more").onclick=()=>{keep();items.push({link:"",name:"",sale:"",size:"",qty:1});showLamma(code)}}
+  upd();
+  $("jf").onsubmit=async e=>{e.preventDefault();const name=$("jn").value.trim(),phone=normPhone($("jp").value),address=$("ja").value.trim();
+    if(name.length<2)return $("je").textContent="اكتبي اسمج.";
+    if(!/^07\d{9}$/.test(phone))return $("je").textContent="رقم الموبايل لازم يبدي بـ07 و11 رقم.";
+    let its;
+    if(mode==="cart"){const u=($("bl").value.match(/https?:\/\/\S+/)||[""])[0],t=parseFloat($("bt").value),n=Math.round(+$("bc").value||0);
+      if(!LINK_RE.test(u))return $("je").textContent="الصقي رابط سلتج من شي ان.";
+      if(!(t>0))return $("je").textContent="اكتبي مجموع السلة بالدولار.";
+      if(!(n>0))return $("je").textContent="اكتبي كم قطعة بالسلة.";
+      its=[{link:u,name:`سلة شي ان (${n} قطعة)`,size:"—",qty:1,count:n,usd:t,sale:+(t*USD_AED).toFixed(2),basket:true}]}
+    else{its=items.map(i=>({link:i.link.trim(),name:i.name.trim(),size:i.size.trim(),qty:1,usd:parseFloat(i.sale),sale:+(parseFloat(i.sale)*USD_AED).toFixed(2)}));
+      if(its.some(i=>!LINK_RE.test(i.link)))return $("je").textContent="كل رابط لازم يكون من شي ان.";
+      if(its.some(i=>!(i.sale>0)))return $("je").textContent="اكتبي سعر كل قطعة بالدولار."}
+    const sb=e.submitter;sb.disabled=true;
+    try{await api.join(code,{name,phone,address,ship:shipMode,items:its});me={...me,name,phone,address};store.set("me",me);
+      if(!mine.some(m=>m.code===code))mine.unshift({code,title}),store.set("mine",mine);
+      items=[{link:"",name:"",sale:"",size:"",qty:1}];bk={link:"",total:"",count:""};toast("انضفتي للّمّة 🎉");showLamma(code)}catch(x){$("je").textContent=err(x);sb.disabled=false}};
+}
+async function showOrders(){
+  const v=$("view");
+  if(!me.phone||!mine.length){v.innerHTML=`<div class="card"><h3>طلباتي</h3><p class="sub">بعدج ما مشتركة بأي لمّة من هالموبايل.</p><a class="btn" data-go href="./">افتحي لمّة</a></div>`;return}
+  v.innerHTML=`<p class="sub" style="text-align:center">دا نحمّل…</p>`;
+  let os=[];try{os=await api.myOrders(me.phone,mine.map(m=>m.code))}catch(x){v.innerHTML=`<p class="err">${esc(err(x))}</p>`;return}
+  const title=c=>(mine.find(m=>m.code===c)||{}).title||c;
+  const open=mine.filter(m=>!os.some(o=>o.lamma_code===m.code));
+  v.innerHTML=`<h2 style="font-size:1.8rem">طلباتي</h2>
+  ${os.map(o=>{const its=o.items.map(i=>esc(i.name)).join("، "),head=`<div class="oh"><b>${esc(title(o.lamma_code))}</b><span class="pill ${o.status}">${({pending:"بانتظار التسعير",quoted:"وصل السعر",accepted:"مأكد",rejected:"مرفوض",cancelled:"ملغي"})[o.status]}</span></div><p class="sub">طلب #${o.id} · ${its}</p>`;
+    if(o.status==="pending")return `<div class="card">${head}<p class="sub">اللمّة انقفلت ${+o.ship_off_pct?`وحصلتن خصم <b>${+o.ship_off_pct}%</b> على الشحن 🎉`:""}. نراجع سلتج ونطلعلج السعر النهائي قريباً.</p></div>`;
+    if(o.status==="rejected"||o.status==="cancelled")return `<div class="card">${head}${o.admin_note?`<p class="sub">${esc(o.admin_note)}</p>`:""}</div>`;
+    const box=`<div class="quote"><div class="q"><span>البضاعة</span><span class="num">${iqd(o.goods_iqd)}</span></div>
+      <div class="q"><span>الشحن ${o.ship_mode==="sea"?"🚢 بحري":"✈️ جوي"}${+o.ship_off_pct?` (خصم اللمّة ${+o.ship_off_pct}%)`:""}</span><span class="num">${+o.ship_iqd?iqd(o.ship_iqd):"مجاني"}</span></div>
+      <div class="q"><span>خدمة الطلب</span><span class="num">${iqd(o.comm_iqd)}</span></div><div class="q"><span>التوصيل</span><span class="num">${iqd(o.delivery_iqd)}</span></div>
+      <div class="q t"><span>المجموع</span><span class="num">${iqd(o.total_iqd)}</span></div></div>${+o.saved_iqd>0?`<div class="save">وفّرتي ${iqd(o.saved_iqd)} ويّا اللمّة والخصومات</div>`:""}${o.admin_note?`<p class="sub">${esc(o.admin_note)}</p>`:""}`;
+    if(o.status==="quoted")return `<div class="card">${head}${box}<button class="btn" data-acc="${esc(o.code)}">موافقة، أريد أطلبه</button><p class="sub">بعد الموافقة نتواصل وياج لدفع العربون ${iqd(o.deposit_iqd)}.</p></div>`;
+    const paid=+o.paid_iqd>0?+o.paid_iqd:(o.deposit_paid?+o.deposit_iqd:0);
+    return `<div class="card">${head}${box}<p class="sub">${paid?`✓ دفعتي لحد هسه <b class="num">${iqd(paid)}</b>`:`العربون بانتظار الدفع (${iqd(o.deposit_iqd)})`}</p>
+      ${o.stage<4?`<p class="sub">💵 الباقي نقداً من تستلمين: <b class="num">${iqd(Math.max(0,o.total_iqd-paid))}</b></p>`:`<p class="sub">✓ تسلّمتي طلبج. شكراً!</p>`}
+      <ul class="track">${STAGES.map((s,i)=>`<li class="${i<=o.stage&&(o.stage>0||paid)?"done":""}">${s}</li>`).join("")}</ul></div>`}).join("")}
+  ${open.length?`<div class="card mylist"><h3>لمّات بعدها مفتوحة</h3>${open.map(m=>`<a data-go href="?l=${esc(m.code)}"><span>${esc(m.title)}</span><span class="sub">شوفي ←</span></a>`).join("")}</div>`:""}
+  <button class="btn ghost" id="rf">حدّثي</button>`;
+  $("rf").onclick=showOrders;
+  v.querySelectorAll("[data-acc]").forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api.accept(me.phone,b.dataset.acc);toast("تم. نتواصل وياج للعربون");showOrders()}catch(x){b.disabled=false;toast(err(x))}});
+}
+addEventListener("popstate",route);
+api.settings().finally(route);
+</script>
+</body>
+</html>
