@@ -6,7 +6,7 @@
 <title>لوحة طلبيتي</title>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 <style>
 body{font-size:16px}
 .page{max-width:920px}
@@ -168,7 +168,9 @@ function view(){
       <p class="hint">تغيير الإيميل يوصلك عليه رابط تأكيد، وما يتغير إلا بعد ما تفتحه.</p>
       <p class="sub" id="aMsg"></p><button class="btn" type="button" id="saveA">حدّث حساب الدخول</button></div>
     <div class="card"><h3>نسخة احتياطية</h3><p class="hint">تنزل ملفين تفتحهم بالإكسل: الطلبات والمصاريف.</p>
-      <button class="btn ghost" type="button" id="bk">⬇️ نزّل نسخة احتياطية</button></div>`;
+      <button class="btn ghost" type="button" id="bk">⬇️ نزّل نسخة احتياطية (إكسل)</button>
+      <p class="hint" style="margin-top:8px">النسخة الكاملة: ملف واحد بكل بيانات النظام (الطلبات، القبض، المصاريف، الكوبونات، الإعدادات) تحتفظ بيه إذا صار شي.</p>
+      <p class="sub" id="bkMsg"></p><button class="btn" type="button" id="bkFull">💾 نسخة كاملة للنظام</button></div>`;
   $("app").innerHTML=`<div class="top">${T.map(([k,l,n])=>`<button type="button" data-tab="${k}" aria-current="${tab===k}">${l}${n?`<span class="dot">${n}</span>`:""}</button>`).join("")}</div>${body}`;
   bind();
 }
@@ -318,6 +320,11 @@ function bind(){
     const {error}=await db.auth.updateUser(upd);
     if(error){msg.textContent=error.message;return}
     msg.className="sub";msg.textContent=(pw?"انغيّرت كلمة السر ✓ ":"")+(m?"وصلك رابط تأكيد على الإيميل الجديد.":"");$("aPw").value=$("aPw2").value=""};
+  if($("bkFull"))$("bkFull").onclick=async()=>{const m=$("bkMsg");m.className="sub";m.textContent="دا أجمع البيانات…";
+    const out={app:"talabiti",exported_at:new Date().toISOString()};
+    for(const t of ["orders","expenses","coupons","settings"]){const {data,error}=await db.from(t).select("*");if(error){m.className="err";m.textContent=t+": "+error.message;return}out[t]=data}
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,1)],{type:"application/json"}));a.download="talabiti-backup-"+new Date().toISOString().slice(0,10)+".json";document.body.appendChild(a);a.click();a.remove();
+    m.textContent=`انحفظت النسخة ✓ (${out.orders.length} طلب، ${out.expenses.length} مصروف)`};
   if($("bk"))$("bk").onclick=()=>{const csv=(name,head,rows)=>{const e=v=>`"${String(v??"").replace(/"/g,'""')}"`;
       const t="\ufeff"+[head,...rows].map(r=>r.map(e).join(",")).join("\r\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv;charset=utf-8"}));a.download=name+"-"+new Date().toISOString().slice(0,10)+".csv";document.body.appendChild(a);a.click();a.remove()};
     csv("orders",["رقم","التاريخ","الزبون","الموبايل","المحافظة","الحالة","المرحلة","المجموع","العمولة","المقبوض","المتبقي","كوبون","الرابط الأول"],orders.map(o=>[o.id,String(o.created_at).slice(0,10),o.customer_name,o.phone,o.city,ST[o.status]||o.status,STAGES[o.stage]||"",o.total_iqd,o.comm_iqd,o.paid_iqd,Math.max(0,(+o.total_iqd||0)-(+o.paid_iqd||0)),o.coupon_code,(o.items&&o.items[0]&&o.items[0].link)||""]));
