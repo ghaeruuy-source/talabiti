@@ -1,8 +1,8 @@
 :root{
   --bg:#F3F1F4; --card:#FFFFFF; --ink:#1D1622; --mute:#6B6170; --line:#E4DEE7;
   --accent:#C2185B; --accent-fg:#FFFFFF; --soft:#FBE7EF; --ok:#2E7D5B; --warn:#B26A00; --deal:#D93025;
-  --display:"Readex Pro","IBM Plex Sans Arabic",Tahoma,sans-serif;
-  --body:"IBM Plex Sans Arabic","Segoe UI",Tahoma,sans-serif;
+  --display:"Almarai",Tahoma,sans-serif;
+  --body:"Almarai","Segoe UI",Tahoma,sans-serif;
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#141016; --card:#1E1921; --ink:#F2EDF4; --mute:#A79CAD; --line:#332B37;
