@@ -184,7 +184,7 @@ function card(o){
         <div class="field"><label for="pn${o.id}">ملاحظة (اختياري)</label><input id="pn${o.id}" placeholder="عربون، تحويل..."></div>
         <p class="err" id="pe${o.id}"></p><button class="btn" type="button" data-pay="${o.id}">سجّل قبض</button></details>`}
     if(o.status==="accepted")act+=`
-      <h4>وين وصل الطلب؟</h4><div class="steps">${STAGES.map((s,i)=>`<button type="button" class="${i<=o.stage&&o.deposit_paid?"done":""}" data-stg="${o.id}:${i}">${s}</button>`).join("")}</div>
+      <h4>وين وصل الطلب؟</h4><div class="steps">${STAGES.map((s,i)=>`<button type="button" class="${i<=o.stage&&(o.stage>0||o.deposit_paid||+o.paid_iqd>0)?"done":""}" data-stg="${o.id}:${i}">${s}</button>`).join("")}</div>
       <div class="row"><div class="field" style="max-width:220px"><label for="eta${o.id}">يوصل للزبون تقريباً</label><input id="eta${o.id}" type="date" data-eta="${o.id}" value="${o.eta||""}"></div></div>`;
   }
   const tel=o.phone.replace(/^0/,"964");
