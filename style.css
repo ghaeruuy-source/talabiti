@@ -68,3 +68,6 @@ input,select,textarea{font:inherit;padding:10px 12px;border:1.5px solid var(--li
 .pill.new{background:var(--soft);color:var(--accent)}
 .pill.off{background:var(--bg);color:var(--mute)}
 .ltr{direction:ltr;unicode-bidi:isolate;word-break:break-all}
+.opt{display:grid;gap:2px;text-align:center;padding:12px 8px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:700 1rem var(--display);cursor:pointer}
+.opt small{font:400 .75rem var(--body);color:var(--mute)}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:var(--soft);box-shadow:0 0 0 1px var(--accent)}

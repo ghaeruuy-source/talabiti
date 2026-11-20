@@ -6,7 +6,7 @@
 <title>لوحة طلبيتي</title>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 <style>
 body{font-size:16px}
 .page{max-width:920px}
@@ -151,7 +151,8 @@ function view(){
         <div class="field"><label for="sRate" id="sRateL">${curPref()==="USD"?"الدولار بكم دينار؟":"الدرهم بكم دينار؟"}</label><input id="sRate" type="number" inputmode="decimal" step="any" value="${rateShown()}"></div>
         <div class="field"><label for="sComm">ربحك (عمولة ٪)</label><input id="sComm" type="number" value="${+settings?.commission_pct}"></div></div>
       <div class="row">
-        <div class="field"><label for="sShip">الشحن لكل كيلو (دينار)</label><input id="sShip" type="number" value="${+settings?.ship_per_kg}"></div>
+        <div class="field"><label for="sShip">شحن جوي ✈️ لكل كيلو (دينار)</label><input id="sShip" type="number" value="${+settings?.ship_per_kg}"></div>
+        <div class="field"><label for="sSea">شحن بحري 🚢 لكل متر مكعب (دينار)</label><input id="sSea" type="number" value="${settings&&"ship_sea_per_cbm" in settings?+settings.ship_sea_per_cbm:""}" ${settings&&"ship_sea_per_cbm" in settings?"":"disabled placeholder=\"يتفعّل بعد تحديث قاعدة البيانات\""}></div>
         <div class="field"><label for="sDel">التوصيل (دينار)</label><input id="sDel" type="number" value="${+settings?.delivery}"></div>
         <div class="field"><label for="sDep">العربون ٪</label><input id="sDep" type="number" value="${+settings?.deposit_pct}"></div></div>
       <h3 style="margin-top:8px">الصفحة</h3>
@@ -236,7 +237,11 @@ function card(o){
   if(o.status==="pending"){
     const qty=o.items.reduce((a,i)=>a+(i.basket?+i.count||1:+i.qty),0);
     act=`<h4>التسعير</h4><div class="row"><div class="field"><label for="sa${o.id}">المجموع بشي ان بعد الخصم (درهم)</label><input id="sa${o.id}" type="number" step="0.01" inputmode="decimal" value="${+o.sale_aed?(+o.sale_aed).toFixed(2):""}" placeholder="من سلة الزبون"></div>
-      <div class="field"><label for="k${o.id}">الوزن (كغم)</label><input id="k${o.id}" type="number" step="0.05" value="${(qty*0.35).toFixed(2)}"></div></div>
+      ${o.ship_mode==="sea"?`<input id="k${o.id}" type="hidden" value="0"></div>
+      <div class="row"><div class="field"><label for="L${o.id}">🚢 الطول (سم)</label><input id="L${o.id}" type="number" inputmode="decimal" step="any" placeholder="40"></div>
+        <div class="field"><label for="W${o.id}">العرض (سم)</label><input id="W${o.id}" type="number" inputmode="decimal" step="any" placeholder="30"></div>
+        <div class="field"><label for="H${o.id}">الارتفاع (سم)</label><input id="H${o.id}" type="number" inputmode="decimal" step="any" placeholder="20"></div></div>`
+      :`<div class="field"><label for="k${o.id}">الوزن (كغم)</label><input id="k${o.id}" type="number" step="0.05" value="${(qty*0.35).toFixed(2)}"></div></div>`}
       <div class="pv" id="pv${o.id}" data-pv="${o.id}"></div>
       <div class="row"><button class="btn" style="flex:2" type="button" data-q="${o.id}">أرسل السعر للزبون</button><button class="btn ghost" style="flex:1" type="button" data-rej="${o.id}">ارفض</button></div>`;
   }else if(o.status==="quoted"||o.status==="accepted"){
@@ -259,7 +264,7 @@ function card(o){
   const pill=o.status==="accepted"&&o.stage>=4?["ok","تسلّم ✓"]:[o.status==="pending"?"wait":o.status==="accepted"?"ok":o.status==="quoted"?"new":"off",ST[o.status]];
   return`<div class="ao${o.status==="pending"?" pending":""}">
     <div class="ao-h"><b>#${o.id} · ${esc(o.customer_name)}</b><span class="pill ${pill[0]}">${pill[1]}</span></div>
-    <div class="ao-c"><span>📍 ${esc(o.city)}${o.address?` · ${esc(o.address)}`:""}</span><a class="wa ltr" href="https://wa.me/${esc(tel)}" target="_blank" rel="noopener">واتساب ${esc(o.phone)}</a><span>${new Date(o.created_at).toLocaleString("ar-IQ",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}</span>${o.note?`<span>📝 ${esc(o.note)}</span>`:""}</div>
+    <div class="ao-c"><span>${o.ship_mode==="sea"?"🚢 بحري":"✈️ جوي"}</span><span>📍 ${esc(o.city)}${o.address?` · ${esc(o.address)}`:""}</span><a class="wa ltr" href="https://wa.me/${esc(tel)}" target="_blank" rel="noopener">واتساب ${esc(o.phone)}</a><span>${new Date(o.created_at).toLocaleString("ar-IQ",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}</span>${o.note?`<span>📝 ${esc(o.note)}</span>`:""}</div>
     <div class="ao-i">${items}</div>${o.status==="accepted"?`<div class="ao-a" style="padding-block:6px"><button class="btn sm ghost" type="button" data-stmt="${esc(o.phone)}">📄 كشف حساب ${esc(o.customer_name)}</button></div>`:""}${act?`<div class="ao-a">${act}</div>`:""}</div>`;
 }
 function bind(){
@@ -276,14 +281,17 @@ function bind(){
   if($("stPrint"))$("stPrint").onclick=()=>window.print();
   if($("q"))$("q").oninput=e=>{q=e.target.value;const pos=e.target.selectionStart;view();const n=$("q");n.focus();n.setSelectionRange(pos,pos)};
   A.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filter=b.dataset.f;view()});
+  const cbmOf=id=>$("L"+id)?(+$("L"+id).value||0)*(+$("W"+id).value||0)*(+$("H"+id).value||0)/1e6:0;
   const preview=id=>{const S=settings,el=$("pv"+id);if(!S||!el)return;const sale=+$("sa"+id).value||0,kg=+$("k"+id).value||0;
     if(!(sale>0)){el.innerHTML=`<span class="hint">اكتب المجموع بالدرهم ويطلعلك السعر بالدينار هنا.</span>`;return}
     const c=coupons.filter(x=>x.active&&sale>=+x.min_aed).sort((a,b)=>b.pct-a.pct)[0],net=sale-(c?sale*c.pct/100:0);
-    const goods=Math.round(net*S.rate_aed),ship=Math.round(kg*S.ship_per_kg),comm=Math.round(goods*S.commission_pct/100),tot=goods+ship+comm+ +S.delivery;
-    el.innerHTML=`<span class="hint">السعر للزبون</span><span class="big num">${iqd(tot)}</span><span class="hint">بضاعة ${iqd(goods)} · شحن ${iqd(ship)} · توصيل ${iqd(S.delivery)} · <b style="color:var(--ok)">ربحك ${iqd(comm)}</b>${c?` · بكوبون ${esc(c.code)}`:""}</span>`};
-  A.querySelectorAll("[data-pv]").forEach(x=>{const id=+x.dataset.pv;preview(id);$("sa"+id).oninput=$("k"+id).oninput=()=>preview(id)});
+    const od=orders.find(x=>x.id===id)||{},off=+od.ship_off_pct||0,sea=od.ship_mode==="sea",cbm=sea?cbmOf(id):0;
+    const goods=Math.round(net*S.rate_aed),ship=Math.round(Math.round(sea?cbm*(+S.ship_sea_per_cbm||0):kg*S.ship_per_kg)*(100-off)/100),comm=Math.round(goods*S.commission_pct/100),tot=goods+ship+comm+ +S.delivery;
+    el.innerHTML=`<span class="hint">السعر للزبون</span><span class="big num">${iqd(tot)}</span><span class="hint">بضاعة ${iqd(goods)} · شحن ${sea?`بحري 🚢 (${cbm.toFixed(3)} م³)`:"جوي ✈️"} ${iqd(ship)}${off?` (خصم لمّة ${off}%)`:""} · توصيل ${iqd(S.delivery)} · <b style="color:var(--ok)">ربحك ${iqd(comm)}</b>${c?` · بكوبون ${esc(c.code)}`:""}</span>`};
+  A.querySelectorAll("[data-pv]").forEach(x=>{const id=+x.dataset.pv;preview(id);$("sa"+id).oninput=$("k"+id).oninput=()=>preview(id);["L","W","H"].forEach(d=>{if($(d+id))$(d+id).oninput=()=>preview(id)})});
   A.querySelectorAll("[data-q]").forEach(b=>b.onclick=async()=>{const id=+b.dataset.q;if(!(+$("sa"+id).value>0)){$("pv"+id).innerHTML=`<span class="err">اكتب المجموع بالدرهم أول.</span>`;return}b.disabled=true;
-    const {error}=await db.rpc("quote_order",{p_id:id,p_kg:+$("k"+id).value||0,p_sale_aed:+$("sa"+id).value||null});
+    const sea=!!$("L"+id),cbm=cbmOf(id);if(sea&&!(cbm>0)){alert("اكتب الطول والعرض والارتفاع للشحنة البحرية.");return}
+    const {error}=await db.rpc("quote_order",sea?{p_id:id,p_kg:0,p_sale_aed:+$("sa"+id).value||null,p_cbm:cbm}:{p_id:id,p_kg:+$("k"+id).value||0,p_sale_aed:+$("sa"+id).value||null});
     if(error){alert(error.message)}await load();view();});
   A.querySelectorAll("[data-rej]").forEach(b=>b.onclick=async()=>{await db.from("orders").update({status:"rejected"}).eq("id",+b.dataset.rej);await load();view()});
   const savePays=async(o,arr)=>{const paid=arr.reduce((x,q)=>x+ +q.amount,0);
@@ -329,7 +337,7 @@ function bind(){
       const t="\ufeff"+[head,...rows].map(r=>r.map(e).join(",")).join("\r\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv;charset=utf-8"}));a.download=name+"-"+new Date().toISOString().slice(0,10)+".csv";document.body.appendChild(a);a.click();a.remove()};
     csv("orders",["رقم","التاريخ","الزبون","الموبايل","المحافظة","الحالة","المرحلة","المجموع","العمولة","المقبوض","المتبقي","كوبون","الرابط الأول"],orders.map(o=>[o.id,String(o.created_at).slice(0,10),o.customer_name,o.phone,o.city,ST[o.status]||o.status,STAGES[o.stage]||"",o.total_iqd,o.comm_iqd,o.paid_iqd,Math.max(0,(+o.total_iqd||0)-(+o.paid_iqd||0)),o.coupon_code,(o.items&&o.items[0]&&o.items[0].link)||""]));
     setTimeout(()=>csv("expenses",["التاريخ","المصروف","النوع","المبلغ (دينار)"],expenses.map(e=>[e.spent_on,e.title,e.category,e.amount_iqd])),400)};
-  if($("saveS"))$("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,"").replace(/^0(?=7)/,"964"),shein_url:$("sUrl").value.trim(),rate_aed:Math.round((($("sCur").value==="USD"?+$("sRate").value/USD_AED:+$("sRate").value))*10000)/10000,ship_per_kg:+$("sShip").value,commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
+  if($("saveS"))$("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,"").replace(/^0(?=7)/,"964"),shein_url:$("sUrl").value.trim(),rate_aed:Math.round((($("sCur").value==="USD"?+$("sRate").value/USD_AED:+$("sRate").value))*10000)/10000,ship_per_kg:+$("sShip").value,...("ship_sea_per_cbm" in (settings||{})?{ship_sea_per_cbm:+$("sSea").value}:{}),commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
 }
 let unseen=0;const baseTitle=document.title;
 function newOrderAlert(o){unseen++;document.title=`(${unseen}) طلب جديد · ${baseTitle}`;

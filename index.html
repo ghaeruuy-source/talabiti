@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <header class="bar"><div class="container"><b id="shopName">طلبيتي</b><span style="font-size:.82rem;opacity:.9">من شي ان الإمارات لباب بيتك</span></div></header>
@@ -33,7 +33,7 @@ const STAGES=["انطلب من شي ان","بالطريق للعراق","وصل 
 const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 let settings={rate_aed:410,shop_name:"طلبيتي",shein_url:"https://ar.shein.com/",whatsapp:""},coupons=[],orders=[];
 let cart=store.get("cart",[]),me=store.get("me",{name:"",phone:"",city:"",address:""}),codes=store.get("codes",[]);
-let tab="home",flash="",draft={};
+let tab="home",flash="",draft={},shipMode=store.get("ship","air");
 
 // رابط مشارك من تطبيق شي ان (أندرويد) أو ?link=
 const qp=new URLSearchParams(location.search);
@@ -138,6 +138,10 @@ function render(){
         ${c?`<div class="q d"><span>كوبون ${esc(c.code)} (${+c.pct}%)</span><span class="num">-${aed(sale*c.pct/100)}</span></div>`:""}
         ${orig>sale||c?`<div class="saved">موفّر لحد هسه ${aed(orig-sale+(c?sale*c.pct/100:0))}</div>`:""}</div>`:""}
       ${nextC&&sale>0?`<p class="sub">ضيف ${aed(nextC.min_aed-sale)} وتاخذ خصم ${+nextC.pct}% بكوبون ${esc(nextC.code)}.</p>`:""}
+      ${settings.ship_sea_per_cbm==null?"":`<div class="card"><h3>طريقة الشحن</h3><div class="two">
+        <button type="button" class="opt" data-ship="air" aria-pressed="${shipMode==="air"}">✈️ جوي<small>أسرع · ${settings.ship_per_kg?iqd(settings.ship_per_kg)+" للكيلو":""}</small></button>
+        <button type="button" class="opt" data-ship="sea" aria-pressed="${shipMode==="sea"}">🚢 بحري<small>أرخص وياخذ وقت أكثر · ${settings.ship_sea_per_cbm?iqd(settings.ship_sea_per_cbm)+" للمتر المكعب":""}</small></button></div>
+        <p class="sub">الجوي يتحسب بالوزن، والبحري بحجم الشحنة (المتر المكعب).</p></div>`}
       <div class="card"><h3>معلومات التوصيل</h3>
         <div class="field"><label for="cName">الاسم</label><input id="cName" autocomplete="name" value="${esc(me.name)}"></div>
         <div class="field"><label for="cPhone">رقم الموبايل</label><input id="cPhone" class="ltr" inputmode="tel" autocomplete="tel" placeholder="07xx xxx xxxx" value="${esc(me.phone)}"></div>
@@ -149,13 +153,17 @@ function render(){
       <p class="sub">السعر النهائي بالدينار (ويّا الشحن والتوصيل) يوصلك بعد المراجعة.</p>`;
     flash="";
     el.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.k,1);saveCart();render()});
+    el.querySelectorAll("[data-ship]").forEach(b=>b.onclick=()=>{shipMode=b.dataset.ship;store.set("ship",shipMode);el.querySelectorAll("[data-ship]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
     $("send").onclick=async()=>{
       me={name:$("cName").value.trim(),phone:$("cPhone").value.trim(),city:$("cCity").value.trim(),address:$("cAddr").value.trim()};
       if(me.name.length<2||!me.city){$("err").textContent="اكتب اسمك ومحافظتك.";return}
       if(!/^(0?7\d{9}|9647\d{9})$/.test(me.phone.replace(/\D/g,""))){$("err").textContent="اكتب رقم موبايل عراقي صحيح، مثل 07701234567.";return}
       if(!db){$("err").textContent="الموقع بعده مو مربوط، جرّب بعدين.";return}
       store.set("me",me);$("send").disabled=true;$("send").textContent="دا يرسل…";
-      const {data,error}=await db.rpc("place_order",{p_name:me.name,p_phone:me.phone,p_city:me.city,p_address:me.address,p_note:$("cNote").value,p_items:cart});
+      const args={p_name:me.name,p_phone:me.phone,p_city:me.city,p_address:me.address,p_note:$("cNote").value,p_items:cart};
+      let {data,error}=settings.ship_sea_per_cbm==null?await db.rpc("place_order",args):await db.rpc("place_order",{...args,p_ship_mode:shipMode});
+      // قاعدة بيانات قديمة بدون اختيار الشحن: نرسل بدونه ونكتبه بالملاحظة
+      if(error&&/function|schema cache/i.test(error.message||""))({data,error}=await db.rpc("place_order",{...args,p_note:(args.p_note+" · شحن "+(shipMode==="sea"?"بحري":"جوي")).trim()}));
       if(error){$("err").textContent=error.message||"صار خطأ، جرّب مرة ثانية.";$("send").disabled=false;$("send").textContent="أرسل طلبي";return}
       const row=Array.isArray(data)?data[0]:data;codes.push(row.code);store.set("codes",codes);
       cart=[];saveCart();flash=`انرسل طلبك. رقم الطلب ${row.id}، ونرجعلك بالسعر قريباً.`;await loadOrders();go("orders");};
@@ -170,7 +178,7 @@ function render(){
     const box=`<div class="quote">
       <div class="q"><span>السعر الأصلي</span><span class="num"><s>${iqd(+o.goods_iqd+ +o.saved_iqd)}</s></span></div>
       ${+o.saved_iqd>0?`<div class="q d"><span>خصومات${o.coupon_code?` وكوبون ${esc(o.coupon_code)}`:""}</span><span class="num">-${iqd(o.saved_iqd)}</span></div>`:""}
-      <div class="q"><span>الشحن للعراق</span><span class="num">${iqd(o.ship_iqd)}</span></div>
+      <div class="q"><span>الشحن للعراق ${o.ship_mode==="sea"?"(بحري 🚢)":"(جوي ✈️)"}</span><span class="num">${iqd(o.ship_iqd)}</span></div>
       <div class="q"><span>خدمة الطلب</span><span class="num">${iqd(o.comm_iqd)}</span></div>
       <div class="q"><span>التوصيل</span><span class="num">${iqd(o.delivery_iqd)}</span></div>
       <div class="q t"><span>المجموع</span><span class="num">${iqd(o.total_iqd)}</span></div></div>
