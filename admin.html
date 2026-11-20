@@ -72,7 +72,7 @@ const iqd=n=>Math.round(+n||0).toLocaleString("en-US")+" د.ع";
 const aed=n=>(+n||0).toFixed(2)+" درهم";
 const STAGES=["انطلب من شي ان","بالطريق للعراق","وصل المخزن","بالتوصيل","تسلّم"];
 const ST={pending:"جديد، يحتاج تسعير",quoted:"انرسل السعر",accepted:"وافق الزبون",rejected:"مرفوض",cancelled:"ملغي"};
-let orders=[],coupons=[],settings=null,filter="open",tab="orders";
+let orders=[],coupons=[],expenses=[],expOk=false,settings=null,filter="open",tab="orders";
 
 function loginView(msg=""){
   $("app").innerHTML=`<div class="card" style="max-width:420px;margin:40px auto"><h2>تسجيل دخول</h2>
@@ -85,14 +85,14 @@ function loginView(msg=""){
   $("up").onclick=async()=>{const {error}=await db.auth.signUp({email:$("em").value.trim(),password:$("pw").value});$("err").textContent=error?error.message:"انسوى الحساب. خلي المطوّر يفعّله كمدير، بعدها سجل دخول.";};
 }
 async function load(){
-  const [o,c,s]=await Promise.all([db.from("orders").select("*").order("created_at",{ascending:false}).limit(300),db.from("coupons").select("*").order("created_at"),db.from("settings").select("*").eq("id",1).single()]);
-  orders=o.data||[];coupons=c.data||[];settings=s.data;
+  const [o,c,s,e]=await Promise.all([db.from("orders").select("*").order("created_at",{ascending:false}).limit(300),db.from("coupons").select("*").order("created_at"),db.from("settings").select("*").eq("id",1).single(),db.from("expenses").select("*").order("spent_on",{ascending:false}).order("id",{ascending:false}).limit(500)]);
+  orders=o.data||[];coupons=c.data||[];settings=s.data;expOk=!e.error;expenses=e.data||[];
 }
 function view(){
   let pend=0,sales=0,profit=0;
   orders.forEach(o=>{if(o.status==="pending")pend++;if(o.status==="accepted"){sales+=+o.total_iqd;profit+=+o.comm_iqd}});
   const list=orders.filter(o=>filter==="all"||(filter==="open"?["pending","quoted"].includes(o.status)||(o.status==="accepted"&&o.stage<4):filter==="done"?o.status==="accepted"&&o.stage>=4:o.status===filter));
-  const T=[["orders","الطلبات",pend],["coupons","العروض",0],["settings","الإعدادات",0]];
+  const T=[["orders","الطلبات",pend],["expenses","المصاريف",0],["settings","الإعدادات",0]];
   let body="";
   if(tab==="orders")body=`
     <div class="kpis">
@@ -101,12 +101,30 @@ function view(){
       <div class="kpi"><span>تحتاج تسعير</span><b class="num">${pend}</b></div></div>
     <div class="filters">${[["open","المفتوحة"],["pending","تحتاج تسعير"],["quoted","بانتظار الزبون"],["accepted","مأكدة"],["done","تسلّمت"],["all","الكل"]].map(([k,l])=>`<button type="button" class="chip" aria-pressed="${filter===k}" data-f="${k}">${l}</button>`).join("")}</div>
     ${list.length?list.map(card).join(""):`<p class="empty">ماكو طلبات هنا.</p>`}`;
-  else if(tab==="coupons")body=`<div class="card"><h3>عروض اليوم</h3><p class="hint">الكوبونات الفعّالة تطلع للزبون بالموقع، وأحسن كوبون ينحسب وحده بالتسعير. استعمل نفس الكود بشي ان من تشتري.</p>
+  else if(tab==="expenses"){
+    let inc=0;orders.forEach(o=>{if(o.status==="accepted")inc+=(+o.comm_iqd||0)+(+o.ship_iqd||0)+(+o.delivery_iqd||0)});
+    const tot=expenses.reduce((x,e)=>x+ +e.amount_iqd,0),net=inc-tot;
+    const cats=["شحن","توصيل","أخرى"],by=c=>expenses.filter(e=>e.category===c).reduce((x,e)=>x+ +e.amount_iqd,0);
+    body=!expOk?`<div class="card"><h3>المصاريف</h3><p class="hint">هذا التبويب بعده مو مفعّل (جدول المصاريف مو مضاف بقاعدة البيانات). المطوّر يفعّله وبعدها يشتغل.</p></div>`:`
+    <div class="kpis">
+      <div class="kpi hi"><span>ربحك الصافي</span><b class="num">${iqd(net)}</b></div>
+      <div class="kpi"><span>مجموع المصاريف</span><b class="num">${iqd(tot)}</b></div>
+      <div class="kpi"><span>داخل من الطلبات المأكدة</span><b class="num">${iqd(inc)}</b></div></div>
+    <p class="hint">الصافي = عمولتك + الشحن والتوصيل اللي أخذتهم من الزبايين − مصاريفك. ${cats.map(c=>`${c}: ${iqd(by(c))}`).join(" · ")}</p>
+    <div class="card"><h3>سجّل مصروف</h3>
+      <div class="row"><div class="field" style="flex:2"><label for="xTitle">شنو المصروف؟</label><input id="xTitle" placeholder="مثلاً: شحنة الأسبوع"></div>
+        <div class="field"><label for="xCat">النوع</label><select id="xCat">${cats.map(c=>`<option>${c}</option>`).join("")}</select></div></div>
+      <div class="row"><div class="field"><label for="xAmt">المبلغ (دينار)</label><input id="xAmt" type="number" inputmode="numeric"></div>
+        <div class="field"><label for="xDate">التاريخ</label><input id="xDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div></div>
+      <p class="err" id="xErr"></p><button class="btn" type="button" id="addX">أضف المصروف</button></div>
+    ${expenses.length?`<div class="card"><h3>المصاريف المسجلة</h3>${expenses.map(e=>`<div class="citem"><span><b>${esc(e.title)}</b> <span class="pill new">${esc(e.category)}</span><br><span class="hint">${esc(e.spent_on)}</span></span><span style="display:flex;gap:10px;align-items:center"><b class="num">${iqd(e.amount_iqd)}</b><button class="btn sm ghost" type="button" data-delx="${e.id}">احذف</button></span></div>`).join("")}</div>`:`<p class="empty">ماكو مصاريف مسجلة.</p>`}`;
+  }
+  else body=`<div class="card"><h3>عروض اليوم</h3><p class="hint">الكوبونات الفعّالة تطلع للزبون بالموقع، وأحسن كوبون ينحسب وحده بالتسعير. استعمل نفس الكود بشي ان من تشتري.</p>
       ${coupons.length?coupons.map(c=>`<div class="citem"><span><b class="ltr">${esc(c.code)}</b> · خصم ${+c.pct}% ${+c.min_aed?`· فوق ${+c.min_aed} درهم`:"· على أي طلب"}</span><span style="display:flex;gap:10px;align-items:center"><label><input type="checkbox" data-on="${c.id}"${c.active?" checked":""}> فعّال</label><button class="btn sm ghost" type="button" data-del="${c.id}">احذف</button></span></div>`).join(""):`<p class="hint">ماكو كوبونات بعد.</p>`}
       <h3 style="margin-top:8px">كوبون جديد</h3>
       <div class="row"><div class="field"><label for="nCode">الكود (مثل ما بشي ان)</label><input id="nCode" class="ltr"></div><div class="field"><label for="nPct">الخصم ٪</label><input id="nPct" type="number" value="20"></div><div class="field"><label for="nMin">إذا الطلب فوق (درهم)</label><input id="nMin" type="number" value="0"></div></div>
-      <button class="btn" type="button" id="addC">أضف الكوبون</button></div>`;
-  else body=`<div class="card"><h3>الأسعار</h3>
+      <button class="btn" type="button" id="addC">أضف الكوبون</button></div>
+    <div class="card"><h3>الأسعار</h3>
       <div class="row">
         <div class="field"><label for="sRate">سعر الصرف: الدرهم بكم دينار؟</label><input id="sRate" type="number" value="${+settings?.rate_aed}"></div>
         <div class="field"><label for="sComm">ربحك (عمولة ٪)</label><input id="sComm" type="number" value="${+settings?.commission_pct}"></div></div>
@@ -168,6 +186,9 @@ function bind(){
   A.querySelectorAll("[data-stg]").forEach(x=>x.onclick=async()=>{const [id,st]=x.dataset.stg.split(":").map(Number);await db.from("orders").update({stage:st}).eq("id",id);await load();view()});
   A.querySelectorAll("[data-on]").forEach(x=>x.onchange=async()=>{await db.from("coupons").update({active:x.checked}).eq("id",+x.dataset.on);await load();view()});
   A.querySelectorAll("[data-del]").forEach(x=>x.onclick=async()=>{await db.from("coupons").delete().eq("id",+x.dataset.del);await load();view()});
+  if($("addX"))$("addX").onclick=async()=>{const t=$("xTitle").value.trim(),a=+$("xAmt").value;if(!t||!(a>0)){$("xErr").textContent="اكتب اسم المصروف والمبلغ.";return}
+    const {error}=await db.from("expenses").insert({title:t,category:$("xCat").value,amount_iqd:a,spent_on:$("xDate").value||undefined});if(error){$("xErr").textContent=error.message;return}await load();view()};
+  A.querySelectorAll("[data-delx]").forEach(x=>x.onclick=async()=>{if(!confirm("تحذف هذا المصروف؟"))return;await db.from("expenses").delete().eq("id",+x.dataset.delx);await load();view()});
   if($("addC"))$("addC").onclick=async()=>{const code=$("nCode").value.trim().toUpperCase();if(!code)return;await db.from("coupons").insert({code,pct:+$("nPct").value,min_aed:+$("nMin").value||0});await load();view()};
   if($("saveS"))$("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,"").replace(/^0(?=7)/,"964"),shein_url:$("sUrl").value.trim(),rate_aed:+$("sRate").value,ship_per_kg:+$("sShip").value,commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
 }

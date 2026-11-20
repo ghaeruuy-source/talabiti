@@ -174,3 +174,18 @@ exception when others then null; end $$;
 
 -- موعد الوصول المتوقع
 alter table public.orders add column if not exists eta date;
+
+-- مصاريف أبو البيج (شحن، توصيل، أخرى)
+create table if not exists public.expenses (
+  id bigint generated always as identity primary key,
+  title text not null,
+  category text not null default 'أخرى',
+  amount_iqd numeric not null check (amount_iqd > 0),
+  spent_on date not null default current_date,
+  created_at timestamptz not null default now()
+);
+alter table public.expenses enable row level security;
+drop policy if exists expenses_admin on public.expenses;
+create policy expenses_admin on public.expenses for all using (public.is_admin()) with check (public.is_admin());
+revoke all on public.expenses from anon;
+grant select, insert, update, delete on public.expenses to authenticated;
