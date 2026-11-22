@@ -108,8 +108,7 @@ function render(){
       <div class="field"><label for="dLink">${C?"رابط السلة":"رابط القطعة"}</label><input id="dLink" class="ltr" inputmode="url" placeholder="الصق الرابط هنا" value="${esc(draft.link)}"></div>
       ${draft.link?"":`<button class="btn ghost" type="button" id="dPaste">📋 الصق الرابط</button>`}
       ${C?`<div class="field"><label for="dCount">كم قطعة بالسلة؟</label><input id="dCount" type="number" min="1" max="200" inputmode="numeric" value="${esc(draft.count||"")}"></div>
-         <div class="two"><div class="field"><label for="dTot">مجموع السلة بشي ان</label><input id="dTot" type="number" min="0" step="0.01" inputmode="decimal" placeholder="مثلاً 250" value="${esc(draft.tot||"")}"></div>
-         <div class="field"><label for="dCur">العملة</label><select id="dCur"><option value="AED"${draft.cur!=="USD"?" selected":""}>درهم</option><option value="USD"${draft.cur==="USD"?" selected":""}>دولار</option></select></div></div>
+         <div class="field"><label for="dTot">مجموع السلة بشي ان (بالدولار $)</label><input id="dTot" class="ltr" type="number" min="0" step="0.01" inputmode="decimal" placeholder="مثلاً 68" value="${esc(draft.tot||"")}"></div>
          <p class="sub">اكتب المجموع اللي يطلعلك بأسفل السلة بشي ان (بعد خصومات شي ان).</p><div id="dEst"></div>`
          :`<div class="field"><label for="dName">شنو القطعة؟</label><input id="dName" value="${esc(draft.name)}" placeholder="مثلاً: فستان أسود"></div>`}
       ${!C&&+draft.orig>0?`<p class="num">${+draft.sale>0&&+draft.sale<+draft.orig?`<s>${aed(draft.orig)}</s> <b>${aed(draft.sale)}</b>`:`<b>${aed(draft.orig)}</b>`} <span class="sub">تقريباً</span></p>`:""}
@@ -121,9 +120,9 @@ function render(){
       <p class="err" id="err"></p>
       <button class="btn" type="button" id="addCart">${C?"أضف السلة لطلبي":"أضف للسلة"}</button>
       <a class="btn ghost" href="${esc(settings.shein_url)}" target="_blank" rel="noopener">ارجع لشي ان</a>`;
-    const keep=()=>{draft.link=$("dLink").value;if($("dName"))draft.name=$("dName").value;if($("dCount")){draft.count=$("dCount").value;draft.tot=$("dTot").value;draft.cur=$("dCur").value}};
-    const totAED=()=>{const v=+$("dTot").value||0;return Math.round(($("dCur").value==="USD"?v*USD_AED:v)*100)/100};
-    if(C){const up=()=>{const n=Math.round(+$("dCount").value||0),t=totAED();$("dEst").innerHTML=n>0&&t>0?estBox(estimate(t,n,shipMode)):""};["dCount","dTot","dCur"].forEach(i=>$(i).oninput=up);up()}
+    const keep=()=>{draft.link=$("dLink").value;if($("dName"))draft.name=$("dName").value;if($("dCount")){draft.count=$("dCount").value;draft.tot=$("dTot").value}};
+    const totAED=()=>{const v=+$("dTot").value||0;return Math.round(v*USD_AED*100)/100};
+    if(C){const up=()=>{const n=Math.round(+$("dCount").value||0),t=totAED();$("dEst").innerHTML=n>0&&t>0?estBox(estimate(t,n,shipMode)):""};["dCount","dTot"].forEach(i=>$(i).oninput=up);up()}
     $("mItem").onclick=()=>{keep();draft.cart=false;render()};
     $("mCart").onclick=()=>{keep();draft.cart=true;render()};
     if($("dPaste"))$("dPaste").onclick=async()=>{try{const t=await navigator.clipboard.readText(),u=t.match(LINK_RE);$("dLink").value=u?u[0]:t}catch{$("err").textContent="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق."}};

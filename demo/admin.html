@@ -81,13 +81,13 @@ const db=cfg.SUPABASE_URL?supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_AN
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const iqd=n=>Math.round(+n||0).toLocaleString("en-US")+" د.ع";
-const aed=n=>(+n||0).toFixed(2)+" درهم";
+const aed=n=>"$"+((+n||0)/3.6725).toFixed(2);
 const STAGES=["انطلب من شي ان","بالطريق للعراق","وصل المخزن","بالتوصيل","تسلّم"];
 const ST={pending:"جديد، يحتاج تسعير",quoted:"انرسل السعر",accepted:"وافق الزبون",rejected:"مرفوض",cancelled:"ملغي"};
 const USD_AED=3.6725;
-const qCur=()=>{try{return localStorage.getItem("qcur")==="AED"?"AED":"USD"}catch{return "USD"}};
+const qCur=()=>"USD";
 const saleAED=id=>{const v=+$("sa"+id).value||0,c=$("sc"+id)?$("sc"+id).value:"AED";return c==="USD"?v*USD_AED:v};
-const curPref=()=>{try{return localStorage.getItem("cur")==="USD"?"USD":"AED"}catch{return "AED"}};
+const curPref=()=>"USD";
 const rateShown=()=>{const r=+settings?.rate_aed||0;return curPref()==="USD"?Math.round(r*USD_AED):r};
 let adminEmail="";
 let q="",rp="month",rFrom="",rTo="",stmtPhone="";
@@ -143,13 +143,13 @@ function view(){
     ${expenses.length?`<div class="card"><h3>المصاريف المسجلة</h3>${expenses.map(e=>`<div class="citem"><span><b>${esc(e.title)}</b> <span class="pill new">${esc(e.category)}</span><br><span class="hint">${esc(e.spent_on)}</span></span><span style="display:flex;gap:10px;align-items:center"><b class="num">${iqd(e.amount_iqd)}</b><button class="btn sm ghost" type="button" data-delx="${e.id}">احذف</button></span></div>`).join("")}</div>`:`<p class="empty">ماكو مصاريف مسجلة.</p>`}`;
   }
   else body=`<div class="card"><h3>عروض اليوم</h3><p class="hint">الكوبونات الفعّالة تطلع للزبون بالموقع، وأحسن كوبون ينحسب وحده بالتسعير. استعمل نفس الكود بشي ان من تشتري.</p>
-      ${coupons.length?coupons.map(c=>`<div class="citem"><span><b class="ltr">${esc(c.code)}</b> · خصم ${+c.pct}% ${+c.min_aed?`· فوق ${+c.min_aed} درهم`:"· على أي طلب"}</span><span style="display:flex;gap:10px;align-items:center"><label><input type="checkbox" data-on="${c.id}"${c.active?" checked":""}> فعّال</label><button class="btn sm ghost" type="button" data-del="${c.id}">احذف</button></span></div>`).join(""):`<p class="hint">ماكو كوبونات بعد.</p>`}
+      ${coupons.length?coupons.map(c=>`<div class="citem"><span><b class="ltr">${esc(c.code)}</b> · خصم ${+c.pct}% ${+c.min_aed?`· فوق $${Math.round(c.min_aed/3.6725)}`:"· على أي طلب"}</span><span style="display:flex;gap:10px;align-items:center"><label><input type="checkbox" data-on="${c.id}"${c.active?" checked":""}> فعّال</label><button class="btn sm ghost" type="button" data-del="${c.id}">احذف</button></span></div>`).join(""):`<p class="hint">ماكو كوبونات بعد.</p>`}
       <h3 style="margin-top:8px">كوبون جديد</h3>
-      <div class="row"><div class="field"><label for="nCode">الكود (مثل ما بشي ان)</label><input id="nCode" class="ltr"></div><div class="field"><label for="nPct">الخصم ٪</label><input id="nPct" type="number" value="20"></div><div class="field"><label for="nMin">إذا الطلب فوق (درهم)</label><input id="nMin" type="number" value="0"></div></div>
+      <div class="row"><div class="field"><label for="nCode">الكود (مثل ما بشي ان)</label><input id="nCode" class="ltr"></div><div class="field"><label for="nPct">الخصم ٪</label><input id="nPct" type="number" value="20"></div><div class="field"><label for="nMin">إذا الطلب فوق ($)</label><input id="nMin" type="number" value="0"></div></div>
       <button class="btn" type="button" id="addC">أضف الكوبون</button></div>
     <div class="card"><h3>الأسعار</h3>
       <div class="row">
-        <div class="field"><label for="sCur">سعر الصرف حسب</label><select id="sCur"><option value="AED"${curPref()==="AED"?" selected":""}>الدرهم</option><option value="USD"${curPref()==="USD"?" selected":""}>الدولار</option></select></div>
+        <div class="field"><label for="sCur">سعر الصرف حسب</label><select id="sCur"><option value="USD" selected>الدولار</option></select></div>
         <div class="field"><label for="sRate" id="sRateL">${curPref()==="USD"?"الدولار بكم دينار؟":"الدرهم بكم دينار؟"}</label><input id="sRate" type="number" inputmode="decimal" step="any" value="${rateShown()}"></div>
         <div class="field"><label for="sComm">ربحك (عمولة ٪)</label><input id="sComm" type="number" value="${+settings?.commission_pct}"></div></div>
       <div class="row">
@@ -161,7 +161,7 @@ function view(){
       <div class="field"><label for="sName">اسم الصفحة</label><input id="sName" value="${esc(settings?.shop_name)}"></div>
       <div class="field"><label for="sWa">رقم الواتساب</label><input id="sWa" class="ltr" value="${esc(settings?.whatsapp)}"></div>
       <div class="field"><label for="sUrl">رابط شي ان</label><input id="sUrl" class="ltr" value="${esc(settings?.shein_url)}"></div>
-      <p class="hint">الأسعار بشي ان الإمارات بالدرهم. إذا اخترت الدولار، الموقع يحوله للدرهم بالسعر الثابت (١ دولار = ٣.٦٧٢٥ درهم) وبعدها للدينار.</p><p class="sub" id="sMsg"></p>
+      <p class="hint">كل الأسعار بالدولار، والزبون يشوف السعر النهائي بالدينار حسب سعر الصرف اللي تحطه.</p><p class="sub" id="sMsg"></p>
       <button class="btn" type="button" id="saveS">احفظ</button></div>
     <div class="card"><h3>حساب الدخول</h3>
       <p class="hint">الإيميل الحالي: <b class="ltr">${esc(adminEmail)}</b></p>
@@ -233,13 +233,13 @@ function stmtHTML(ph){
 }
 function card(o){
   const items=o.items.map(i=>i.basket
-    ?`<div class="basket"><span><b>🛍️ ${esc(i.name)}</b><br><span class="hint">${+i.sale>0?`الزبون كتب المجموع ${+i.sale} درهم وانحسب السعر تلقائياً. افتح السلة وتأكد إنه مطابق.`:"افتح السلة، شوف المجموع بعد الخصم واكتبه تحت."}</span></span><a class="btn sm" href="${esc(i.link)}" target="_blank" rel="noopener">افتح السلة</a></div>`
-    :`<div class="it">${i.img?`<img src="${esc(i.img)}" alt="">`:""}<div class="t"><b>${esc(i.name)}</b><br><span class="hint">القياس: ${esc(i.size)} · العدد: ${i.qty}${+i.orig>0?` · السعر: <bdi>${(+i.sale).toFixed(2)}</bdi> درهم${i.sale<i.orig?` (كان <s><bdi>${(+i.orig).toFixed(2)}</bdi></s>)`:""}`:""}</span><br><a href="${esc(i.link)}" target="_blank" rel="noopener">افتح القطعة بشي ان ↗</a></div></div>`).join("");
+    ?`<div class="basket"><span><b>🛍️ ${esc(i.name)}</b><br><span class="hint">${+i.sale>0?`الزبون كتب المجموع $${(i.sale/3.6725).toFixed(2)} وانحسب السعر تلقائياً. افتح السلة وتأكد إنه مطابق.`:"افتح السلة، شوف المجموع بعد الخصم واكتبه تحت."}</span></span><a class="btn sm" href="${esc(i.link)}" target="_blank" rel="noopener">افتح السلة</a></div>`
+    :`<div class="it">${i.img?`<img src="${esc(i.img)}" alt="">`:""}<div class="t"><b>${esc(i.name)}</b><br><span class="hint">القياس: ${esc(i.size)} · العدد: ${i.qty}${+i.orig>0?` · السعر: $<bdi>${(i.sale/3.6725).toFixed(2)}</bdi>${i.sale<i.orig?` (كان <s>$<bdi>${(i.orig/3.6725).toFixed(2)}</bdi></s>)`:""}`:""}</span><br><a href="${esc(i.link)}" target="_blank" rel="noopener">افتح القطعة بشي ان ↗</a></div></div>`).join("");
   let act="";
   if(o.status==="pending"){
     const qty=o.items.reduce((a,i)=>a+(i.basket?+i.count||1:+i.qty),0);
     act=`<h4>التسعير</h4><div class="row"><div class="field"><label for="sa${o.id}">المجموع بشي ان بعد الخصم</label><input id="sa${o.id}" type="number" step="0.01" inputmode="decimal" value="${+o.sale_aed?(qCur()==="USD"?+o.sale_aed/USD_AED:+o.sale_aed).toFixed(2):""}" placeholder="من سلة الزبون"></div>
-      <div class="field" style="min-width:90px;max-width:120px"><label for="sc${o.id}">العملة</label><select id="sc${o.id}" data-sc="${o.id}"><option value="USD"${qCur()==="USD"?" selected":""}>دولار</option><option value="AED"${qCur()==="AED"?" selected":""}>درهم</option></select></div>
+      <div class="field" style="min-width:90px;max-width:120px"><label for="sc${o.id}">العملة</label><select id="sc${o.id}" data-sc="${o.id}"><option value="USD" selected>دولار $</option></select></div>
       ${o.ship_mode==="sea"?`<input id="k${o.id}" type="hidden" value="0"></div>
       <div class="row"><div class="field"><label for="L${o.id}">🚢 الطول (سم)</label><input id="L${o.id}" type="number" inputmode="decimal" step="any" placeholder="40"></div>
         <div class="field"><label for="W${o.id}">العرض (سم)</label><input id="W${o.id}" type="number" inputmode="decimal" step="any" placeholder="30"></div>
@@ -319,7 +319,7 @@ function bind(){
     if($("xCur").value==="USD")t+=` (${+$("xAmt").value}$)`;
     const {error}=await db.from("expenses").insert({title:t,category:cat,amount_iqd:a,spent_on:$("xDate").value||undefined});if(error){$("xErr").textContent=error.message;return}await load();view()};
   A.querySelectorAll("[data-delx]").forEach(x=>x.onclick=async()=>{if(!confirm("تحذف هذا المصروف؟"))return;await db.from("expenses").delete().eq("id",+x.dataset.delx);await load();view()});
-  if($("addC"))$("addC").onclick=async()=>{const code=$("nCode").value.trim().toUpperCase();if(!code)return;await db.from("coupons").insert({code,pct:+$("nPct").value,min_aed:+$("nMin").value||0});await load();view()};
+  if($("addC"))$("addC").onclick=async()=>{const code=$("nCode").value.trim().toUpperCase();if(!code)return;await db.from("coupons").insert({code,pct:+$("nPct").value,min_aed:Math.round((+$("nMin").value||0)*3.6725*100)/100});await load();view()};
   if($("sCur"))$("sCur").onchange=()=>{const old=curPref(),nw=$("sCur").value,v=+$("sRate").value||0;
     const aed=old==="USD"?v/USD_AED:v;try{localStorage.setItem("cur",nw)}catch{}
     $("sRate").value=nw==="USD"?Math.round(aed*USD_AED):Math.round(aed*100)/100;$("sRateL").textContent=nw==="USD"?"الدولار بكم دينار؟":"الدرهم بكم دينار؟"};

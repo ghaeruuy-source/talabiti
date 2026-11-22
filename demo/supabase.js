@@ -1,10 +1,10 @@
 /* قاعدة بيانات وهمية للنسخة التجريبية: تقلّد واجهة supabase-js وتحفظ بـ localStorage */
 (function(){
-const KEY="talabiti_demo_v1",USD_AED=3.6725;
+const KEY="talabiti_demo_v2",USD_AED=3.6725;
 const now=Date.now(),ago=h=>new Date(now-h*3600e3).toISOString(),day=d=>new Date(now-d*864e5).toISOString().slice(0,10);
 function seed(){return{seq:1006,
  settings:[{id:1,shop_name:"متجرك (تجريبي)",whatsapp:"",shein_url:"https://ar.shein.com/",rate_aed:410,ship_per_kg:15000,ship_sea_per_cbm:350000,commission_pct:10,delivery:5000,deposit_pct:30,updated_at:ago(1)}],
- coupons:[{id:1,code:"SHEIN20",pct:20,min_aed:150,active:true,created_at:ago(50)},{id:2,code:"NEW10",pct:10,min_aed:0,active:true,created_at:ago(40)}],
+ coupons:[{id:1,code:"SHEIN20",pct:20,min_aed:146.9,active:true,created_at:ago(50)},{id:2,code:"NEW10",pct:10,min_aed:0,active:true,created_at:ago(40)}],
  expenses:[{id:1,title:"شحنة الأسبوع",category:"شحن",amount_iqd:120000,spent_on:day(2),created_at:ago(48)},{id:2,title:"أكياس تغليف",category:"تغليف",amount_iqd:15000,spent_on:day(1),created_at:ago(24)}],
  orders:[
   {id:1001,code:"DEMO01",customer_name:"سارة أحمد",phone:"07701111111",city:"بغداد",address:"المنصور",note:"",items:[{link:"https://ar.shein.com/demo-p-1.html",name:"سلة شي ان كاملة (5 قطعة)",size:"—",qty:1,orig:0,sale:0,img:"",basket:true,count:5}],orig_aed:0,sale_aed:0,status:"pending",stage:0,ship_mode:"air",created_at:ago(2),payments:[],paid_iqd:0,deposit_paid:false,admin_note:""},
