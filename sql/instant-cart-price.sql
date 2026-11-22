@@ -96,3 +96,7 @@ begin
 end $function$;
 
 grant execute on function public.place_order(text,text,text,text,text,jsonb,text) to anon, authenticated;
+
+-- تنظيف بقايا الفحص القديم
+drop schema if exists dbg cascade;
+drop extension if exists pg_net;
