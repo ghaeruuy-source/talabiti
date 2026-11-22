@@ -85,7 +85,7 @@ function render(){
       ${settings.whatsapp?`<p class="sub" style="text-align:center">عندك سؤال؟ واتساب: <a class="ltr" href="https://wa.me/${esc(settings.whatsapp)}" target="_blank" rel="noopener">${esc(settings.whatsapp)}</a></p>`:""}`;
     $("goCart").onclick=()=>{draft={cart:true};go("add")};
     if($("hPaste"))$("hPaste").onclick=async()=>{try{const t=await navigator.clipboard.readText();$("hLink").value=t;$("hErr").textContent=""}catch{$("hErr").textContent="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق."}};
-    if($("hNext"))$("hNext").onclick=()=>{const lm=$("hLink").value.match(LINK_RE);if(!lm){$("hErr").textContent="هذا مو رابط من شي ان. انسخه من زر المشاركة بصفحة القطعة.";return}draft={link:lm[0],cart:/cart|bag|share/i.test(lm[0])};go("add")};
+    if($("hNext"))$("hNext").onclick=()=>{const lm=$("hLink").value.match(LINK_RE);if(!lm){$("hErr").textContent="هذا مو رابط من شي ان. انسخه من زر المشاركة بصفحة القطعة.";return}draft={link:lm[0],cart:/cart|bag|share|سلة|السلة/i.test($("hLink").value)};go("add")};
     return;
   }
   if(tab==="add"){
