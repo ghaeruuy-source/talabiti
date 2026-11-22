@@ -50,6 +50,18 @@ if(m){
 
 function bestCoupon(sale){return coupons.filter(c=>sale>=+c.min_aed).sort((a,b)=>b.pct-a.pct)[0]||null}
 function saveCart(){store.set("cart",cart)}
+const USD_AED=3.6725,KG_PC=0.35;
+// سعر نهائي تلقائي: نفس حساب صاحب الصفحة (كوبون + شحن جوي بالوزن التقريبي + خدمة + توصيل)
+function estimate(sale,pcs,mode){const S=settings,c=bestCoupon(sale),net=sale-(c?sale*c.pct/100:0),R=+S.rate_aed||0;
+  const goods=Math.round(net*R),ship=mode==="sea"?null:Math.round(pcs*KG_PC*(+S.ship_per_kg||0)),comm=Math.round(net*R*(+S.commission_pct||0)/100),del=+S.delivery||0;
+  return{c,goods,ship,comm,del,total:goods+(ship||0)+comm+del,saved:Math.round((sale-net)*R)}}
+function estBox(e){return`<div class="quote">
+  <div class="q"><span>البضاعة${e.c?` (بعد كوبون ${esc(e.c.code)} ${+e.c.pct}%)`:""}</span><span class="num">${iqd(e.goods)}</span></div>
+  <div class="q"><span>الشحن للعراق</span><span class="num">${e.ship==null?"بعد القياس":iqd(e.ship)}</span></div>
+  <div class="q"><span>خدمة الطلب</span><span class="num">${iqd(e.comm)}</span></div>
+  <div class="q"><span>التوصيل</span><span class="num">${iqd(e.del)}</span></div>
+  <div class="q t"><span>${e.ship==null?"المجموع بدون الشحن":"السعر النهائي"}</span><span class="num">${iqd(e.total)}</span></div></div>
+  ${e.saved>0?`<div class="saved">وفّرت ${iqd(e.saved)} بالكوبون</div>`:""}`}
 function tabs(){
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===tab));
   const cq=cart.reduce((a,c)=>a+c.qty,0);$("cartBadge").hidden=!cq;$("cartBadge").textContent=cq;
@@ -92,21 +104,26 @@ function render(){
     const C=!!draft.cart;
     el.innerHTML=`<div class="two"><button type="button" class="btn ${C?"ghost":""}" id="mItem">قطعة وحدة</button><button type="button" class="btn ${C?"":"ghost"}" id="mCart">سلة كاملة</button></div>
       <h3>${C?"أرسل سلتك من شي ان":"أضف قطعة من شي ان"}</h3>${!C&&draft.img?`<img src="${esc(draft.img)}" alt="" style="width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:var(--card)">`:""}
-      ${C?`<p class="sub">بتطبيق شي ان افتح السلة ← زر المشاركة ↗ ← نسخ الرابط، والصقه هنا. حامد يفتح سلتك ويشوف كل القطع اللي اخترتها.</p>`:(draft.link?`<p class="sub">✓ وصلت القطعة. اكتب القياس واللون مثل ما اخترتها بشي ان.</p>`:"")}
+      ${C?`<p class="sub">بتطبيق شي ان افتح السلة ← زر المشاركة ↗ ← نسخ الرابط، والصقه هنا. نفتح سلتك ويشوف كل القطع اللي اخترتها.</p>`:(draft.link?`<p class="sub">✓ وصلت القطعة. اكتب القياس واللون مثل ما اخترتها بشي ان.</p>`:"")}
       <div class="field"><label for="dLink">${C?"رابط السلة":"رابط القطعة"}</label><input id="dLink" class="ltr" inputmode="url" placeholder="الصق الرابط هنا" value="${esc(draft.link)}"></div>
       ${draft.link?"":`<button class="btn ghost" type="button" id="dPaste">📋 الصق الرابط</button>`}
-      ${C?`<div class="field"><label for="dCount">كم قطعة بالسلة؟</label><input id="dCount" type="number" min="1" max="200" inputmode="numeric" value="${esc(draft.count||"")}"></div>`
+      ${C?`<div class="field"><label for="dCount">كم قطعة بالسلة؟</label><input id="dCount" type="number" min="1" max="200" inputmode="numeric" value="${esc(draft.count||"")}"></div>
+         <div class="two"><div class="field"><label for="dTot">مجموع السلة بشي ان</label><input id="dTot" type="number" min="0" step="0.01" inputmode="decimal" placeholder="مثلاً 250" value="${esc(draft.tot||"")}"></div>
+         <div class="field"><label for="dCur">العملة</label><select id="dCur"><option value="AED"${draft.cur!=="USD"?" selected":""}>درهم</option><option value="USD"${draft.cur==="USD"?" selected":""}>دولار</option></select></div></div>
+         <p class="sub">اكتب المجموع اللي يطلعلك بأسفل السلة بشي ان (بعد خصومات شي ان).</p><div id="dEst"></div>`
          :`<div class="field"><label for="dName">شنو القطعة؟</label><input id="dName" value="${esc(draft.name)}" placeholder="مثلاً: فستان أسود"></div>`}
       ${!C&&+draft.orig>0?`<p class="num">${+draft.sale>0&&+draft.sale<+draft.orig?`<s>${aed(draft.orig)}</s> <b>${aed(draft.sale)}</b>`:`<b>${aed(draft.orig)}</b>`} <span class="sub">تقريباً</span></p>`:""}
       ${C?"":`<div class="two">
         <div class="field"><label for="dSize">القياس واللون</label><input id="dSize" value="${esc(draft.size)}" placeholder="M، أسود"></div>
         <div class="field"><label for="dQty">العدد</label><input id="dQty" type="number" min="1" max="20" value="${esc(draft.qty||1)}"></div>
       </div>`}
-      ${C?"":`<p class="sub">حامد يتأكد من القطعة ويطلعلك السعر النهائي بالدينار.</p>`}
+      ${C?"":`<p class="sub">نتأكد من القطعة ويطلعلك السعر النهائي بالدينار.</p>`}
       <p class="err" id="err"></p>
       <button class="btn" type="button" id="addCart">${C?"أضف السلة لطلبي":"أضف للسلة"}</button>
       <a class="btn ghost" href="${esc(settings.shein_url)}" target="_blank" rel="noopener">ارجع لشي ان</a>`;
-    const keep=()=>{draft.link=$("dLink").value;if($("dName"))draft.name=$("dName").value;if($("dCount"))draft.count=$("dCount").value};
+    const keep=()=>{draft.link=$("dLink").value;if($("dName"))draft.name=$("dName").value;if($("dCount")){draft.count=$("dCount").value;draft.tot=$("dTot").value;draft.cur=$("dCur").value}};
+    const totAED=()=>{const v=+$("dTot").value||0;return Math.round(($("dCur").value==="USD"?v*USD_AED:v)*100)/100};
+    if(C){const up=()=>{const n=Math.round(+$("dCount").value||0),t=totAED();$("dEst").innerHTML=n>0&&t>0?estBox(estimate(t,n,shipMode)):""};["dCount","dTot","dCur"].forEach(i=>$(i).oninput=up);up()}
     $("mItem").onclick=()=>{keep();draft.cart=false;render()};
     $("mCart").onclick=()=>{keep();draft.cart=true;render()};
     if($("dPaste"))$("dPaste").onclick=async()=>{try{const t=await navigator.clipboard.readText(),u=t.match(LINK_RE);$("dLink").value=u?u[0]:t}catch{$("err").textContent="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق."}};
@@ -115,7 +132,8 @@ function render(){
         const lm=$("dLink").value.match(LINK_RE),n=Math.round(+$("dCount").value||0);
         if(!lm){$("err").textContent="الصق رابط سلتك من شي ان.";return}
         if(!(n>0)){$("err").textContent="اكتب كم قطعة بالسلة.";return}
-        cart.push({link:lm[0],name:`سلة شي ان كاملة (${n} قطعة)`,size:"—",qty:1,orig:0,sale:0,img:"",basket:true,count:n});saveCart();draft={};flash="انضافت سلتك ✓";go("cart");return;
+        const t=totAED();if(!(t>0)){$("err").textContent="اكتب مجموع السلة مثل ما يطلع بشي ان.";return}
+        cart.push({link:lm[0],name:`سلة شي ان كاملة (${n} قطعة)`,size:"—",qty:1,orig:t,sale:t,img:"",basket:true,count:n});saveCart();draft={};flash="انضافت سلتك ✓";go("cart");return;
       }
       const it={link:$("dLink").value.trim(),name:$("dName").value.trim(),orig:+draft.orig||0,sale:Math.min(+draft.sale||+draft.orig||0,+draft.orig||0),size:$("dSize").value.trim()||"—",img:draft.img||"",qty:Math.min(20,Math.max(1,+$("dQty").value||1))};
       const lm=it.link.match(LINK_RE);
@@ -129,19 +147,20 @@ function render(){
   if(tab==="cart"){
     if(!cart.length){el.innerHTML=`<p class="empty">السلة فارغة. ارجع لشي ان واختار اللي يعجبك.</p><button class="btn ghost" type="button" id="goAdd">أضف قطعة</button>`;$("goAdd").onclick=()=>go("add");return}
     const sale=cart.reduce((a,i)=>a+i.sale*i.qty,0),orig=cart.reduce((a,i)=>a+i.orig*i.qty,0),c=bestCoupon(sale);
+    const allP=cart.every(i=>i.sale>0),pcs=cart.reduce((a,i)=>a+(i.basket?+i.count||1:i.qty),0);
     const nextC=coupons.filter(x=>+x.min_aed>sale).sort((a,b)=>a.min_aed-b.min_aed)[0];
     el.innerHTML=`${flash?`<div class="toast">${flash}</div>`:""}<h3>سلتك</h3>
       ${cart.map((i,k)=>`<div class="line"><div class="h">${i.img?`<img src="${esc(i.img)}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex:none">`:""}<b style="flex:1">${esc(i.name)}</b><button type="button" data-k="${k}" aria-label="احذف">✕</button></div>
-        ${i.basket?`<p class="sub">حامد يفتح سلتك ويسعّرها</p></div>`:`<p class="sub">${esc(i.size)} · العدد ${i.qty}</p>${!(i.orig>0)?`<p class="sub">حامد يسعّرها</p></div>`:`
+        ${i.basket?`<p class="sub">${i.count} قطعة</p>${i.sale>0?`<p class="num"><b>${aed(i.sale)}</b></p>`:`<p class="sub">نفتح سلتك ويسعّرها</p>`}</div>`:`<p class="sub">${esc(i.size)} · العدد ${i.qty}</p>${!(i.orig>0)?`<p class="sub">نسعّرها</p></div>`:`
         <p class="num">${i.sale<i.orig?`<s>${aed(i.orig*i.qty)}</s> `:""}<b>${aed(i.sale*i.qty)}</b>${i.sale<i.orig?` <span class="save">-${Math.round((1-i.sale/i.orig)*100)}%</span>`:""}</p></div>`}`}`).join("")}
-      ${sale>0?`<div class="quote"><div class="q"><span>المجموع التقريبي للبضاعة</span><span class="num">${aed(sale)}</span></div>
+      ${allP?`<h3>سعرك النهائي</h3><div id="cEst">${estBox(estimate(sale,pcs,shipMode))}</div>`:sale>0?`<div class="quote"><div class="q"><span>المجموع التقريبي للبضاعة</span><span class="num">${aed(sale)}</span></div>
         ${c?`<div class="q d"><span>كوبون ${esc(c.code)} (${+c.pct}%)</span><span class="num">-${aed(sale*c.pct/100)}</span></div>`:""}
         ${orig>sale||c?`<div class="saved">موفّر لحد هسه ${aed(orig-sale+(c?sale*c.pct/100:0))}</div>`:""}</div>`:""}
       ${nextC&&sale>0?`<p class="sub">ضيف ${aed(nextC.min_aed-sale)} وتاخذ خصم ${+nextC.pct}% بكوبون ${esc(nextC.code)}.</p>`:""}
       ${settings.ship_sea_per_cbm==null?"":`<div class="card"><h3>طريقة الشحن</h3><div class="two">
         <button type="button" class="opt" data-ship="air" aria-pressed="${shipMode==="air"}">✈️ جوي<small>أسرع</small></button>
         <button type="button" class="opt" data-ship="sea" aria-pressed="${shipMode==="sea"}">🚢 بحري<small>أرخص وياخذ وقت أكثر</small></button></div>
-        <p class="sub">سعر الشحن يوصلك ويّا السعر النهائي.</p></div>`}
+        <p class="sub">${allP?"البحري يتحسب بعد ما نقيس الشحنة.":"سعر الشحن يوصلك ويّا السعر النهائي."}</p></div>`}
       <div class="card"><h3>معلومات التوصيل</h3>
         <div class="field"><label for="cName">الاسم</label><input id="cName" autocomplete="name" value="${esc(me.name)}"></div>
         <div class="field"><label for="cPhone">رقم الموبايل</label><input id="cPhone" class="ltr" inputmode="tel" autocomplete="tel" placeholder="07xx xxx xxxx" value="${esc(me.phone)}"></div>
@@ -149,11 +168,11 @@ function render(){
         <div class="field"><label for="cAddr">المنطقة / أقرب نقطة دالة</label><input id="cAddr" value="${esc(me.address)}"></div></div>
         <div class="field"><label for="cNote">ملاحظة (اختياري)</label><input id="cNote"></div></div>
       <p class="err" id="err"></p>
-      <button class="btn" type="button" id="send">أرسل طلبي</button>
-      <p class="sub">السعر النهائي بالدينار (ويّا الشحن والتوصيل) يوصلك بعد المراجعة.</p>`;
+      <button class="btn" type="button" id="send">${allP&&shipMode!=="sea"?"أكّد طلبي بهذا السعر":"أرسل طلبي"}</button>
+      <p class="sub">${allP?"الشحن الجوي محسوب على وزن تقريبي للقطع.":"السعر النهائي بالدينار (ويّا الشحن والتوصيل) يوصلك بعد المراجعة."}</p>`;
     flash="";
     el.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.k,1);saveCart();render()});
-    el.querySelectorAll("[data-ship]").forEach(b=>b.onclick=()=>{shipMode=b.dataset.ship;store.set("ship",shipMode);el.querySelectorAll("[data-ship]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+    el.querySelectorAll("[data-ship]").forEach(b=>b.onclick=()=>{shipMode=b.dataset.ship;store.set("ship",shipMode);el.querySelectorAll("[data-ship]").forEach(x=>x.setAttribute("aria-pressed",x===b));if(allP)render()});
     $("send").onclick=async()=>{
       me={name:$("cName").value.trim(),phone:$("cPhone").value.trim(),city:$("cCity").value.trim(),address:$("cAddr").value.trim()};
       if(me.name.length<2||!me.city){$("err").textContent="اكتب اسمك ومحافظتك.";return}
@@ -166,7 +185,7 @@ function render(){
       if(error&&/function|schema cache/i.test(error.message||""))({data,error}=await db.rpc("place_order",{...args,p_note:(args.p_note+" · شحن "+(shipMode==="sea"?"بحري":"جوي")).trim()}));
       if(error){$("err").textContent=error.message||"صار خطأ، جرّب مرة ثانية.";$("send").disabled=false;$("send").textContent="أرسل طلبي";return}
       const row=Array.isArray(data)?data[0]:data;codes.push(row.code);store.set("codes",codes);
-      cart=[];saveCart();flash=`انرسل طلبك. رقم الطلب ${row.id}، ونرجعلك بالسعر قريباً.`;await loadOrders();go("orders");};
+      cart=[];saveCart();flash=row.status==="accepted"?`تم تأكيد طلبك ✓ رقم الطلب ${row.id}. راح نتواصل وياك للعربون.`:`انرسل طلبك. رقم الطلب ${row.id}، ونرجعلك بالسعر قريباً.`;await loadOrders();go("orders");};
     return;
   }
   // orders

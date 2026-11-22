@@ -233,7 +233,7 @@ function stmtHTML(ph){
 }
 function card(o){
   const items=o.items.map(i=>i.basket
-    ?`<div class="basket"><span><b>🛍️ ${esc(i.name)}</b><br><span class="hint">افتح السلة، شوف المجموع بعد الخصم واكتبه تحت.</span></span><a class="btn sm" href="${esc(i.link)}" target="_blank" rel="noopener">افتح السلة</a></div>`
+    ?`<div class="basket"><span><b>🛍️ ${esc(i.name)}</b><br><span class="hint">${+i.sale>0?`الزبون كتب المجموع ${+i.sale} درهم وانحسب السعر تلقائياً. افتح السلة وتأكد إنه مطابق.`:"افتح السلة، شوف المجموع بعد الخصم واكتبه تحت."}</span></span><a class="btn sm" href="${esc(i.link)}" target="_blank" rel="noopener">افتح السلة</a></div>`
     :`<div class="it">${i.img?`<img src="${esc(i.img)}" alt="">`:""}<div class="t"><b>${esc(i.name)}</b><br><span class="hint">القياس: ${esc(i.size)} · العدد: ${i.qty}${+i.orig>0?` · السعر: <bdi>${(+i.sale).toFixed(2)}</bdi> درهم${i.sale<i.orig?` (كان <s><bdi>${(+i.orig).toFixed(2)}</bdi></s>)`:""}`:""}</span><br><a href="${esc(i.link)}" target="_blank" rel="noopener">افتح القطعة بشي ان ↗</a></div></div>`).join("");
   let act="";
   if(o.status==="pending"){

@@ -34,10 +34,13 @@ class Q{constructor(t){this.t=t;this.op="select";this.f=[];this.o=[];this.n=null
   if(this.one)return rs.length||this.one===2?ok(rs[0]||null):err("ما موجود");return ok(rs)}}
 const rpc={
  place_order(a){const ph=norm(a.p_phone);if(String(a.p_name||"").trim().length<2)return err("الاسم مطلوب");if(!/^07\d{9}$/.test(ph))return err("رقم الموبايل غير صحيح");
-  let o=0,s=0;for(const it of a.p_items||[]){if(it.basket)continue;const q=+it.qty||1,oo=+it.orig||0;o+=oo*q;s+=Math.min(+it.sale||oo,oo)*q}
+  let o=0,s=0,pcs=0,all=true;for(const it of a.p_items||[]){const q=+it.qty||1,oo=+it.orig||0;pcs+=it.basket?(+it.count||1):q;if(!(oo>0)){all=false;continue}o+=oo*q;s+=Math.min(+it.sale||oo,oo)*q}
   const id=++D.seq,code=Math.random().toString(16).slice(2,8).toUpperCase();
   const r={id,code,customer_name:a.p_name.trim(),phone:ph,city:a.p_city,address:a.p_address||"",note:a.p_note||"",items:a.p_items,orig_aed:o,sale_aed:s,status:"pending",stage:0,ship_mode:a.p_ship_mode||"air",created_at:new Date().toISOString(),payments:[],paid_iqd:0,deposit_paid:false,admin_note:""};
-  D.orders.push(r);save({table:"orders",eventType:"INSERT",new:r});return ok([{id,code}])},
+  D.orders.push(r);
+  // سعر نهائي تلقائي: إذا كل القطع مسعّرة والشحن جوي، ينحسب السعر وينقبل الطلب مباشرة
+  if(all&&s>0&&r.ship_mode!=="sea"){rpc.quote_order({p_id:id,p_kg:Math.round(pcs*0.35*100)/100,p_sale_aed:s});r.status="accepted";r.accepted_at=r.quoted_at;r.admin_note="";}
+  save({table:"orders",eventType:"INSERT",new:r});return ok([{id,code,status:r.status}])},
  track_orders(a){const ph=norm(a.p_phone);return ok(clone(D.orders.filter(r=>r.phone===ph&&(a.p_codes||[]).includes(r.code)).sort((x,y)=>x.created_at<y.created_at?1:-1)))},
  accept_order(a){const r=D.orders.find(r=>r.code===a.p_code&&r.phone===norm(a.p_phone)&&r.status==="quoted");if(!r)return err("الطلب غير موجود أو مو بانتظار موافقتك");r.status="accepted";r.accepted_at=new Date().toISOString();save({table:"orders",eventType:"UPDATE"});return ok(null)},
  quote_order(a){const S=D.settings[0],o=D.orders.find(r=>r.id===a.p_id);if(!o)return err("الطلب غير موجود");
