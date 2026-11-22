@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 <header class="bar"><div class="container"><b id="shopName">طلبيتي</b><span style="font-size:.82rem;opacity:.9">من شي ان الإمارات لباب بيتك</span></div></header>
@@ -34,6 +34,7 @@ const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{re
 let settings={rate_aed:410,shop_name:"طلبيتي",shein_url:"https://ar.shein.com/",whatsapp:""},coupons=[],orders=[];
 let cart=store.get("cart",[]),me=store.get("me",{name:"",phone:"",city:"",address:""}),codes=store.get("codes",[]);
 let tab="home",flash="",draft={},shipMode=store.get("ship","air");
+let calcStage="form",calcData={},calcErr="";
 
 // رابط مشارك من تطبيق شي ان (أندرويد) أو ?link=
 const qp=new URLSearchParams(location.search);
@@ -69,6 +70,23 @@ function shrink(file){return new Promise((res,rej)=>{const img=new Image(),u=URL
   img.onload=()=>{const M=1568,k=Math.min(1,M/Math.max(img.width,img.height)),cv=document.createElement("canvas");cv.width=Math.round(img.width*k);cv.height=Math.round(img.height*k);
     cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);URL.revokeObjectURL(u);res(cv.toDataURL("image/jpeg",0.85))};
   img.onerror=()=>{URL.revokeObjectURL(u);rej(new Error("img"))};img.src=u})}
+async function runQuote(){
+  calcData.link=(($("qLink")&&$("qLink").value)||calcData.link||"").trim();
+  const lm=calcData.link.match(LINK_RE);
+  if(!lm){calcErr="الصق رابط سلتك من شي ان.";render();return}
+  calcData.link=lm[0];
+  if(!calcData.imgData){calcErr="صوّر سلتك وبيها المجموع، وارفع الصورة.";render();return}
+  if(!db){calcErr="الموقع بعده مو مربوط، جرّب بعدين.";render();return}
+  calcErr="";calcStage="loading";render();scrollTo(0,0);
+  let i=0;const adv=()=>{const a=$("qs"+i);if(a){a.classList.remove("on");a.classList.add("done")}i++;const b=$("qs"+i);if(b)b.classList.add("on")};
+  const t1=setTimeout(adv,1500),t2=setTimeout(adv,3200);
+  let res=null;
+  try{const [{data,error}]=await Promise.all([db.functions.invoke("cart-price",{body:{image:calcData.imgData}}),new Promise(z=>setTimeout(z,1800))]);res=error?null:data}catch{}
+  clearTimeout(t1);clearTimeout(t2);
+  if(res&&res.ok&&res.read_id){calcData.read=res;calcStage="result"}
+  else{calcStage="form";calcErr=res&&res.nokey?"التسعير الفوري مو مفعّل بعد. أضف سلتك من «أضف قطعة» وصاحب الصفحة يسعّرها.":(res&&res.reason)||"ما كدرنا نقرا صورة سلتك. جرّب سكرين شوت أوضح وبيه المجموع."}
+  if(tab==="calc")render();
+}
 function tabs(){
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===tab));
   const cq=cart.reduce((a,c)=>a+c.qty,0);$("cartBadge").hidden=!cq;$("cartBadge").textContent=cq;
@@ -81,6 +99,8 @@ function render(){
   const notice=!db?`<p class="err">الموقع بعده مو مربوط بقاعدة البيانات.</p>`:"";
   if(tab==="home"){
     el.innerHTML=`${notice}
+      <div class="pcal"><div class="top"><span class="chip">⚡ حاسبة السعر الفورية</span><h2>شگد سعر سلتك؟</h2><p>الصق رابط سلتك وارفع صورتها، ويطلعلك السعر بالدينار شامل الشحن.</p>
+        <button class="btn" type="button" id="goCalc" style="background:#fff;color:#7B1FA2;margin-top:6px">احسب سعر سلتي ←</button></div></div>
       ${IN_APP?"":`<div class="card" style="border:2px solid var(--accent)"><h3>رجعت من شي ان؟ الصق رابط القطعة أو رابط سلتك هنا</h3>
         <div class="field"><input id="hLink" class="ltr" inputmode="url" placeholder="الصق الرابط هنا" aria-label="رابط القطعة"></div>
         <div class="two"><button class="btn ghost" type="button" id="hPaste">📋 الصق</button><button class="btn" type="button" id="hNext">التالي</button></div>
@@ -102,9 +122,54 @@ function render(){
       ${coupons.length?`<h3>عروض اليوم</h3>${coupons.map(c=>`<div class="coupon"><div><b>خصم ${+c.pct}%</b><p class="sub">${+c.min_aed?`على طلبك فوق ${aed(c.min_aed)}`:"على أي طلب"}</p></div><span class="pill new ltr">${esc(c.code)}</span></div>`).join("")}<p class="sub">ما تحتاج تكتب الكود، ينحسب وحده على طلبك.</p>`:""}
       ${IN_APP?"":`<p class="sub" style="text-align:center">نصيحة: ضيف هالموقع لشاشة موبايلك (من قائمة المتصفح ← إضافة للشاشة الرئيسية) حتى ترجعله بسرعة.</p>`}
       ${settings.whatsapp?`<p class="sub" style="text-align:center">عندك سؤال؟ واتساب: <a class="ltr" href="https://wa.me/${esc(settings.whatsapp)}" target="_blank" rel="noopener">${esc(settings.whatsapp)}</a></p>`:""}`;
-    $("goCart").onclick=()=>{draft={cart:true};go("add")};
+    $("goCart").onclick=()=>go("calc");
+    $("goCalc").onclick=()=>{calcErr="";go("calc")};
     if($("hPaste"))$("hPaste").onclick=async()=>{try{const t=await navigator.clipboard.readText();$("hLink").value=t;$("hErr").textContent=""}catch{$("hErr").textContent="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق."}};
     if($("hNext"))$("hNext").onclick=()=>{const lm=$("hLink").value.match(LINK_RE);if(!lm){$("hErr").textContent="هذا مو رابط من شي ان. انسخه من زر المشاركة بصفحة القطعة.";return}draft={link:lm[0],cart:/cart|bag|share|سلة|السلة/i.test($("hLink").value)};go("add")};
+    return;
+  }
+  if(tab==="calc"){
+    const cur=c=>c==="USD"?"$":c==="AED"?"درهم":c;
+    if(calcStage==="loading"){
+      el.innerHTML=`<div class="loader"><div class="orb">🚚</div><h3>دنحضّر التسعيرة</h3><p class="sub">تاخذ من ٥ لـ ١٥ ثانية عادةً.</p><div class="bar"><i></i></div>
+        <div class="steps"><div class="s on" id="qs0"><span class="n">1</span>دنقرأ سلتك…</div><div class="s" id="qs1"><span class="n">2</span>دنحسب الشحن للعراق…</div><div class="s" id="qs2"><span class="n">3</span>دنحوّل الأسعار للدينار…</div></div></div>`;
+      return;
+    }
+    if(calcStage==="result"&&calcData.read){
+      const R=calcData.read,e=estimate(R.total_aed,R.pieces,"air"),dep=Math.round(e.total*(+settings.deposit_pct||0)/100/1000)*1000;
+      el.innerHTML=`<div class="pcal">
+        <div class="bigp"><span class="lbl">🛍️ سلتك · ${R.pieces} قطعة</span><span class="amt num">${iqd(e.total)}</span><span class="inc">السعر شامل كلشي — البضاعة والشحن والتوصيل</span></div>
+        <div class="rowbox">
+          <div class="q"><span>البضاعة${e.c?` <small class="sub">(بعد كوبون ${esc(e.c.code)} ${+e.c.pct}%)</small>`:""}</span><span class="num">${iqd(e.goods)}</span></div>
+          <div class="q"><span>الشحن للعراق ✈️</span><span class="num">${iqd(e.ship)}</span></div>
+          <div class="q"><span>خدمة الطلب</span><span class="num">${iqd(e.comm)}</span></div>
+          <div class="q"><span>التوصيل</span><span class="num">${iqd(e.del)}</span></div></div>
+        ${e.saved>0?`<div class="saved">وفّرت ${iqd(e.saved)} بالكوبون</div>`:""}
+        ${dep>0?`<div class="dep"><span>🏷️ العربون المطلوب</span><span class="num">${iqd(dep)}</span></div>`:""}
+        <p class="sub" style="text-align:center">قرينا من صورتك: ${R.pieces} قطعة بمجموع ${R.total} ${cur(R.currency)}. إذا الرقم غلط ارجع وارفع صورة أوضح.</p>
+        <button class="btn" type="button" id="qOrder">اطلبها هسه ←</button>
+        <button class="btn ghost" type="button" id="qAgain">احسب سلة ثانية</button></div>`;
+      $("qOrder").onclick=()=>{cart.push({link:calcData.link,name:`سلة شي ان كاملة (${R.pieces} قطعة)`,size:"—",qty:1,orig:R.total_aed,sale:R.total_aed,img:"",basket:true,count:R.pieces,read_id:R.read_id});
+        saveCart();shipMode="air";store.set("ship","air");calcData={};calcStage="form";go("cart")};
+      $("qAgain").onclick=()=>{calcData={};calcStage="form";calcErr="";render()};
+      return;
+    }
+    el.innerHTML=`<div class="pcal">
+      <div class="top"><span class="chip">⚡ حاسبة السعر الفورية</span><h2>شگد سعر سلتك؟</h2><p>بالدينار، شامل الشحن والتوصيل.</p></div>
+      <div class="card">
+        <div class="field"><label for="qLink">١) رابط سلتك من شي ان</label><input id="qLink" class="ltr" inputmode="url" placeholder="https://onelink.shein.com/..." value="${esc(calcData.link||"")}"></div>
+        <button class="btn ghost" type="button" id="qPaste">📋 الصق الرابط</button>
+        <label class="drop ${calcData.imgData?"has":""}" for="qImg"><span class="big">${calcData.imgData?"✓":"📷"}</span>
+          <span>${calcData.imgData?"انضافت صورة سلتك — اضغط حتى تغيّرها":"٢) صوّر سلتك (سكرين شوت) وبيها المجموع، وارفعها هنا"}</span></label>
+        <input id="qImg" type="file" accept="image/*" hidden>
+        ${calcErr?`<p class="err">${esc(calcErr)}</p>`:""}
+        <button class="btn" type="button" id="qGo">شوف السعر ←</button>
+        <p class="sub" style="text-align:center">🔒 ما نحتاج حسابك ولا الباسورد — بس رابط السلة وصورتها.</p></div>
+      <div class="card"><h3>شلون أنسخ رابط سلتي؟</h3><ol class="howto"><li>افتح تطبيق شي ان وروح للسلة</li><li>اضغط زر المشاركة ↗ واختار نسخ الرابط</li><li>الصقه فوك، وصوّر السلة وبيها المجموع</li></ol></div></div>`;
+    $("qPaste").onclick=async()=>{try{const t=await navigator.clipboard.readText(),u=t.match(LINK_RE);$("qLink").value=u?u[0]:t}catch{calcErr="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق.";calcData.link=$("qLink").value;render()}};
+    $("qImg").onchange=async()=>{const f=$("qImg").files[0];if(!f)return;calcData.link=$("qLink").value;try{calcData.imgData=await shrink(f);calcErr=""}catch{calcErr="ما كدرنا نفتح الصورة، جرّب صورة ثانية."}render()};
+    $("qLink").onchange=$("qLink").onpaste=()=>setTimeout(()=>{const u=$("qLink").value.match(LINK_RE);if(u)$("qLink").value=u[0]},0);
+    $("qGo").onclick=()=>runQuote();
     return;
   }
   if(tab==="add"){
