@@ -50,6 +50,25 @@ if(m){
 
 function bestCoupon(sale){return coupons.filter(c=>sale>=+c.min_aed).sort((a,b)=>b.pct-a.pct)[0]||null}
 function saveCart(){store.set("cart",cart)}
+const KG_PC=0.35;
+const waNum=v=>{let d=String(v||"").replace(/\D/g,"");if(d.startsWith("00"))d=d.slice(2);if(d.startsWith("0"))d="964"+d.slice(1);return d.length>=10?d:""};
+// نفس حساب السيرفر: كوبون + شحن جوي بوزن تقريبي للقطع + خدمة + توصيل
+function estimate(sale,pcs,mode){const S=settings,c=bestCoupon(sale),net=sale-(c?sale*c.pct/100:0),R=+S.rate_aed||0;
+  const goods=Math.round(net*R),ship=mode==="sea"?null:Math.round(Math.round(pcs*KG_PC*100)/100*(+S.ship_per_kg||0)),comm=Math.round(net*R*(+S.commission_pct||0)/100),del=+S.delivery||0;
+  return{c,goods,ship,comm,del,total:goods+(ship||0)+comm+del,saved:Math.round((sale-net)*R)}}
+function estBox(e){return`<div class="quote">
+  <div class="q"><span>البضاعة${e.c?` (بعد كوبون ${esc(e.c.code)} ${+e.c.pct}%)`:""}</span><span class="num">${iqd(e.goods)}</span></div>
+  <div class="q"><span>الشحن للعراق</span><span class="num">${e.ship==null?"بعد القياس":iqd(e.ship)}</span></div>
+  <div class="q"><span>خدمة الطلب</span><span class="num">${iqd(e.comm)}</span></div>
+  <div class="q"><span>التوصيل</span><span class="num">${iqd(e.del)}</span></div>
+  <div class="q t"><span>${e.ship==null?"المجموع بدون الشحن":"السعر النهائي"}</span><span class="num">${iqd(e.total)}</span></div></div>
+  ${e.saved>0?`<div class="saved">وفّرت ${iqd(e.saved)} بالكوبون</div>`:""}`}
+function readBox(R){return`<p class="sub">✓ قرينا سلتك: <b>${R.pieces}</b> قطعة، المجموع <b class="num">${R.total} ${R.currency==="USD"?"$":R.currency==="AED"?"درهم":R.currency}</b>. إذا الرقم غلط ارفع صورة أوضح.</p>${estBox(estimate(R.total_aed,R.pieces,shipMode))}`}
+// نصغّر الصورة قبل لا نرفعها حتى تروح بسرعة
+function shrink(file){return new Promise((res,rej)=>{const img=new Image(),u=URL.createObjectURL(file);
+  img.onload=()=>{const M=1568,k=Math.min(1,M/Math.max(img.width,img.height)),cv=document.createElement("canvas");cv.width=Math.round(img.width*k);cv.height=Math.round(img.height*k);
+    cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);URL.revokeObjectURL(u);res(cv.toDataURL("image/jpeg",0.85))};
+  img.onerror=()=>{URL.revokeObjectURL(u);rej(new Error("img"))};img.src=u})}
 function tabs(){
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===tab));
   const cq=cart.reduce((a,c)=>a+c.qty,0);$("cartBadge").hidden=!cq;$("cartBadge").textContent=cq;
@@ -92,10 +111,12 @@ function render(){
     const C=!!draft.cart;
     el.innerHTML=`<div class="two"><button type="button" class="btn ${C?"ghost":""}" id="mItem">قطعة وحدة</button><button type="button" class="btn ${C?"":"ghost"}" id="mCart">سلة كاملة</button></div>
       <h3>${C?"أرسل سلتك من شي ان":"أضف قطعة من شي ان"}</h3>${!C&&draft.img?`<img src="${esc(draft.img)}" alt="" style="width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:var(--card)">`:""}
-      ${C?`<p class="sub">بتطبيق شي ان افتح السلة ← زر المشاركة ↗ ← نسخ الرابط، والصقه هنا. حامد يفتح سلتك ويشوف كل القطع اللي اخترتها.</p>`:(draft.link?`<p class="sub">✓ وصلت القطعة. اكتب القياس واللون مثل ما اخترتها بشي ان.</p>`:"")}
+      ${C?`<p class="sub">١) بتطبيق شي ان افتح السلة ← زر المشاركة ↗ ← نسخ الرابط، والصقه هنا.<br>٢) صوّر سلتك (سكرين شوت) وبيها المجموع، وارفعها، ويطلعلك السعر النهائي بالدينار فوراً.</p>`:(draft.link?`<p class="sub">✓ وصلت القطعة. اكتب القياس واللون مثل ما اخترتها بشي ان.</p>`:"")}
       <div class="field"><label for="dLink">${C?"رابط السلة":"رابط القطعة"}</label><input id="dLink" class="ltr" inputmode="url" placeholder="الصق الرابط هنا" value="${esc(draft.link)}"></div>
       ${draft.link?"":`<button class="btn ghost" type="button" id="dPaste">📋 الصق الرابط</button>`}
-      ${C?`<div class="field"><label for="dCount">كم قطعة بالسلة؟</label><input id="dCount" type="number" min="1" max="200" inputmode="numeric" value="${esc(draft.count||"")}"></div>`
+      ${C?`<label class="btn ${draft.read?"ghost":""}" for="dImg" id="dImgL" style="cursor:pointer">📷 ${draft.read?"غيّر صورة السلة":"ارفع صورة سلتك"}</label><input id="dImg" type="file" accept="image/*" hidden>
+         <div id="dEst">${draft.read?readBox(draft.read):draft.readMsg?`<p class="sub">${esc(draft.readMsg)}</p>`:""}</div>
+         ${draft.read?"":`<div class="field"><label for="dCount">كم قطعة بالسلة؟</label><input id="dCount" type="number" min="1" max="200" inputmode="numeric" value="${esc(draft.count||"")}"></div>`}`
          :`<div class="field"><label for="dName">شنو القطعة؟</label><input id="dName" value="${esc(draft.name)}" placeholder="مثلاً: فستان أسود"></div>`}
       ${!C&&+draft.orig>0?`<p class="num">${+draft.sale>0&&+draft.sale<+draft.orig?`<s>${aed(draft.orig)}</s> <b>${aed(draft.sale)}</b>`:`<b>${aed(draft.orig)}</b>`} <span class="sub">تقريباً</span></p>`:""}
       ${C?"":`<div class="two">
@@ -107,15 +128,25 @@ function render(){
       <button class="btn" type="button" id="addCart">${C?"أضف السلة لطلبي":"أضف للسلة"}</button>
       <a class="btn ghost" href="${esc(settings.shein_url)}" target="_blank" rel="noopener">ارجع لشي ان</a>`;
     const keep=()=>{draft.link=$("dLink").value;if($("dName"))draft.name=$("dName").value;if($("dCount"))draft.count=$("dCount").value};
+    if($("dImg"))$("dImg").onchange=async()=>{const f=$("dImg").files[0];if(!f)return;keep();
+      $("dEst").innerHTML=`<p class="sub">⏳ دا نقرا سلتك…</p>`;$("dImgL").style.pointerEvents="none";$("addCart").disabled=true;
+      let res=null;
+      try{const image=await shrink(f);const {data,error}=await db.functions.invoke("cart-price",{body:{image}});res=error?null:data}catch{}
+      draft.read=null;draft.readMsg="";
+      if(res&&res.ok&&res.read_id){draft.read={read_id:res.read_id,total:res.total,currency:res.currency,pieces:res.pieces,total_aed:res.total_aed};draft.count=res.pieces}
+      else if(res&&res.ok){draft.count=res.pieces;draft.readMsg=`قريت: ${res.pieces} قطعة بمجموع ${res.total} ${res.currency==="USD"?"دولار":res.currency==="AED"?"درهم":res.currency}. حامد يأكدلك السعر النهائي.`}
+      else draft.readMsg=res&&res.nokey?"اكتب عدد القطع، وحامد يسعّر سلتك ويرجعلك.":(res&&res.reason)||"ما كدرنا نقرا الصورة هسه. اكتب عدد القطع، وحامد يسعّر سلتك.";
+      render()};
     $("mItem").onclick=()=>{keep();draft.cart=false;render()};
     $("mCart").onclick=()=>{keep();draft.cart=true;render()};
     if($("dPaste"))$("dPaste").onclick=async()=>{try{const t=await navigator.clipboard.readText(),u=t.match(LINK_RE);$("dLink").value=u?u[0]:t}catch{$("err").textContent="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق."}};
     $("addCart").onclick=()=>{
       if(C){
-        const lm=$("dLink").value.match(LINK_RE),n=Math.round(+$("dCount").value||0);
+        const lm=$("dLink").value.match(LINK_RE),R=draft.read,n=R?R.pieces:Math.round(+$("dCount").value||0);
         if(!lm){$("err").textContent="الصق رابط سلتك من شي ان.";return}
-        if(!(n>0)){$("err").textContent="اكتب كم قطعة بالسلة.";return}
-        cart.push({link:lm[0],name:`سلة شي ان كاملة (${n} قطعة)`,size:"—",qty:1,orig:0,sale:0,img:"",basket:true,count:n});saveCart();draft={};flash="انضافت سلتك ✓";go("cart");return;
+        if(!(n>0)){$("err").textContent="ارفع صورة سلتك، أو اكتب كم قطعة بيها.";return}
+        cart.push(R?{link:lm[0],name:`سلة شي ان كاملة (${n} قطعة)`,size:"—",qty:1,orig:R.total_aed,sale:R.total_aed,img:"",basket:true,count:n,read_id:R.read_id}
+                   :{link:lm[0],name:`سلة شي ان كاملة (${n} قطعة)`,size:"—",qty:1,orig:0,sale:0,img:"",basket:true,count:n});saveCart();draft={};flash="انضافت سلتك ✓";go("cart");return;
       }
       const it={link:$("dLink").value.trim(),name:$("dName").value.trim(),orig:+draft.orig||0,sale:Math.min(+draft.sale||+draft.orig||0,+draft.orig||0),size:$("dSize").value.trim()||"—",img:draft.img||"",qty:Math.min(20,Math.max(1,+$("dQty").value||1))};
       const lm=it.link.match(LINK_RE);
@@ -129,19 +160,20 @@ function render(){
   if(tab==="cart"){
     if(!cart.length){el.innerHTML=`<p class="empty">السلة فارغة. ارجع لشي ان واختار اللي يعجبك.</p><button class="btn ghost" type="button" id="goAdd">أضف قطعة</button>`;$("goAdd").onclick=()=>go("add");return}
     const sale=cart.reduce((a,i)=>a+i.sale*i.qty,0),orig=cart.reduce((a,i)=>a+i.orig*i.qty,0),c=bestCoupon(sale);
+    const allP=cart.every(i=>i.basket&&i.read_id&&i.sale>0),pcs=cart.reduce((a,i)=>a+(i.basket?+i.count||1:i.qty),0);
     const nextC=coupons.filter(x=>+x.min_aed>sale).sort((a,b)=>a.min_aed-b.min_aed)[0];
     el.innerHTML=`${flash?`<div class="toast">${flash}</div>`:""}<h3>سلتك</h3>
       ${cart.map((i,k)=>`<div class="line"><div class="h">${i.img?`<img src="${esc(i.img)}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex:none">`:""}<b style="flex:1">${esc(i.name)}</b><button type="button" data-k="${k}" aria-label="احذف">✕</button></div>
-        ${i.basket?`<p class="sub">حامد يفتح سلتك ويسعّرها</p></div>`:`<p class="sub">${esc(i.size)} · العدد ${i.qty}</p>${!(i.orig>0)?`<p class="sub">حامد يسعّرها</p></div>`:`
+        ${i.basket?`<p class="sub">${i.count} قطعة</p>${i.read_id&&i.sale>0?`<p class="num"><b>${aed(i.sale)}</b></p>`:`<p class="sub">حامد يفتح سلتك ويسعّرها</p>`}</div>`:`<p class="sub">${esc(i.size)} · العدد ${i.qty}</p>${!(i.orig>0)?`<p class="sub">حامد يسعّرها</p></div>`:`
         <p class="num">${i.sale<i.orig?`<s>${aed(i.orig*i.qty)}</s> `:""}<b>${aed(i.sale*i.qty)}</b>${i.sale<i.orig?` <span class="save">-${Math.round((1-i.sale/i.orig)*100)}%</span>`:""}</p></div>`}`}`).join("")}
-      ${sale>0?`<div class="quote"><div class="q"><span>المجموع التقريبي للبضاعة</span><span class="num">${aed(sale)}</span></div>
+      ${allP?`<h3>سعرك النهائي</h3>${estBox(estimate(sale,pcs,shipMode))}`:sale>0?`<div class="quote"><div class="q"><span>المجموع التقريبي للبضاعة</span><span class="num">${aed(sale)}</span></div>
         ${c?`<div class="q d"><span>كوبون ${esc(c.code)} (${+c.pct}%)</span><span class="num">-${aed(sale*c.pct/100)}</span></div>`:""}
         ${orig>sale||c?`<div class="saved">موفّر لحد هسه ${aed(orig-sale+(c?sale*c.pct/100:0))}</div>`:""}</div>`:""}
-      ${nextC&&sale>0?`<p class="sub">ضيف ${aed(nextC.min_aed-sale)} وتاخذ خصم ${+nextC.pct}% بكوبون ${esc(nextC.code)}.</p>`:""}
+      ${nextC&&sale>0&&!allP?`<p class="sub">ضيف ${aed(nextC.min_aed-sale)} وتاخذ خصم ${+nextC.pct}% بكوبون ${esc(nextC.code)}.</p>`:""}
       ${settings.ship_sea_per_cbm==null?"":`<div class="card"><h3>طريقة الشحن</h3><div class="two">
         <button type="button" class="opt" data-ship="air" aria-pressed="${shipMode==="air"}">✈️ جوي<small>أسرع</small></button>
         <button type="button" class="opt" data-ship="sea" aria-pressed="${shipMode==="sea"}">🚢 بحري<small>أرخص وياخذ وقت أكثر</small></button></div>
-        <p class="sub">سعر الشحن يوصلك ويّا السعر النهائي.</p></div>`}
+        <p class="sub">${allP?"البحري ينحسب بعد ما نقيس الشحنة، وحامد يرجعلك بالسعر.":"سعر الشحن يوصلك ويّا السعر النهائي."}</p></div>`}
       <div class="card"><h3>معلومات التوصيل</h3>
         <div class="field"><label for="cName">الاسم</label><input id="cName" autocomplete="name" value="${esc(me.name)}"></div>
         <div class="field"><label for="cPhone">رقم الموبايل</label><input id="cPhone" class="ltr" inputmode="tel" autocomplete="tel" placeholder="07xx xxx xxxx" value="${esc(me.phone)}"></div>
@@ -149,11 +181,11 @@ function render(){
         <div class="field"><label for="cAddr">المنطقة / أقرب نقطة دالة</label><input id="cAddr" value="${esc(me.address)}"></div></div>
         <div class="field"><label for="cNote">ملاحظة (اختياري)</label><input id="cNote"></div></div>
       <p class="err" id="err"></p>
-      <button class="btn" type="button" id="send">أرسل طلبي</button>
-      <p class="sub">السعر النهائي بالدينار (ويّا الشحن والتوصيل) يوصلك بعد المراجعة.</p>`;
+      <button class="btn" type="button" id="send">${allP&&shipMode!=="sea"?"أكّد طلبي بهذا السعر":"أرسل طلبي"}</button>
+      <p class="sub">${allP&&shipMode!=="sea"?"الشحن الجوي محسوب على وزن تقريبي للقطع.":"السعر النهائي بالدينار (ويّا الشحن والتوصيل) يوصلك بعد المراجعة."}</p>`;
     flash="";
     el.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.k,1);saveCart();render()});
-    el.querySelectorAll("[data-ship]").forEach(b=>b.onclick=()=>{shipMode=b.dataset.ship;store.set("ship",shipMode);el.querySelectorAll("[data-ship]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+    el.querySelectorAll("[data-ship]").forEach(b=>b.onclick=()=>{shipMode=b.dataset.ship;store.set("ship",shipMode);el.querySelectorAll("[data-ship]").forEach(x=>x.setAttribute("aria-pressed",x===b));if(allP)render()});
     $("send").onclick=async()=>{
       me={name:$("cName").value.trim(),phone:$("cPhone").value.trim(),city:$("cCity").value.trim(),address:$("cAddr").value.trim()};
       if(me.name.length<2||!me.city){$("err").textContent="اكتب اسمك ومحافظتك.";return}
@@ -166,7 +198,12 @@ function render(){
       if(error&&/function|schema cache/i.test(error.message||""))({data,error}=await db.rpc("place_order",{...args,p_note:(args.p_note+" · شحن "+(shipMode==="sea"?"بحري":"جوي")).trim()}));
       if(error){$("err").textContent=error.message||"صار خطأ، جرّب مرة ثانية.";$("send").disabled=false;$("send").textContent="أرسل طلبي";return}
       const row=Array.isArray(data)?data[0]:data;codes.push(row.code);store.set("codes",codes);
-      cart=[];saveCart();flash=`انرسل طلبك. رقم الطلب ${row.id}، ونرجعلك بالسعر قريباً.`;await loadOrders();go("orders");};
+      cart=[];saveCart();await loadOrders();const placed=orders.find(o=>o.code===row.code);
+      flash=placed&&placed.status==="accepted"?`تم تأكيد طلبك ✓ رقم الطلب ${row.id}. راح نتواصل وياك.`:`انرسل طلبك. رقم الطلب ${row.id}، ونرجعلك بالسعر قريباً.`;go("orders");
+      // بعد ما ينحفظ بالنظام نفتح الواتساب برسالة جاهزة
+      const wa=waNum(settings.whatsapp);if(wa){const txt=[`مرحبا، سويت طلب من ${settings.shop_name||"الموقع"}`,`رقم الطلب: ${row.id} (كود ${row.code})`,
+        placed&&placed.status==="accepted"?`السعر النهائي: ${iqd(placed.total_iqd)}`:"بانتظار التسعير",`الاسم: ${me.name} · ${me.city}`].join("\n");
+        const u=`https://wa.me/${wa}?text=${encodeURIComponent(txt)}`;const w=window.open(u,"_blank");if(!w)location.href=u}};
     return;
   }
   // orders
