@@ -261,7 +261,7 @@ function card(o){
       <div class="row"><div class="field"><label for="L${o.id}">🚢 الطول (سم)</label><input id="L${o.id}" type="number" inputmode="decimal" step="any" placeholder="40"></div>
         <div class="field"><label for="W${o.id}">العرض (سم)</label><input id="W${o.id}" type="number" inputmode="decimal" step="any" placeholder="30"></div>
         <div class="field"><label for="H${o.id}">الارتفاع (سم)</label><input id="H${o.id}" type="number" inputmode="decimal" step="any" placeholder="20"></div></div>`
-      :`<div class="field"><label for="k${o.id}">الوزن (كغم)</label><input id="k${o.id}" type="number" step="0.05" value="${(qty*0.35).toFixed(2)}"></div></div>`}
+      :`<input id="k${o.id}" type="hidden" value="0"></div><p class="hint">✈️ الشحن ما ينحسب هسه. لمن يوصل الطلب للعراق تكتب الشحن الفعلي بالطلب وينضاف لحساب الزبون.</p>`}
       <div class="pv" id="pv${o.id}" data-pv="${o.id}"></div>
       <div class="row"><button class="btn" style="flex:2" type="button" data-q="${o.id}">أرسل السعر للزبون</button><button class="btn ghost" style="flex:1" type="button" data-rej="${o.id}">ارفض</button></div>`;
   }else if(o.status==="quoted"||o.status==="accepted"){
@@ -278,6 +278,8 @@ function card(o){
         <p class="err" id="pe${o.id}"></p><button class="btn" type="button" data-pay="${o.id}">سجّل قبض</button></details>`}
     if(o.status==="accepted")act+=`
       <h4>وين وصل الطلب؟</h4><div class="steps">${STAGES.map((s,i)=>`<button type="button" class="${i<=o.stage&&(o.stage>0||o.deposit_paid||+o.paid_iqd>0)?"done":""}" data-stg="${o.id}:${i}">${s}</button>`).join("")}</div>
+      ${o.ship_mode==="sea"?"":`<div class="row"><div class="field"><label for="sh${o.id}">✈️ الشحن الفعلي (دينار)${+o.ship_iqd>0?"":" — ما انضاف بعد"}</label><input id="sh${o.id}" type="number" inputmode="numeric" step="250" value="${+o.ship_iqd||""}" placeholder="اللي حاسبتك بيه شركة الشحن"></div>
+        <button class="btn" style="flex:0 0 auto;width:auto;align-self:end" type="button" data-ship="${o.id}">${+o.ship_iqd>0?"حدّث الشحن":"أضف للزبون"}</button></div>`}
       <div class="row"><div class="field" style="max-width:220px"><label for="eta${o.id}">يوصل للزبون تقريباً</label><input id="eta${o.id}" type="date" data-eta="${o.id}" value="${o.eta||""}"></div></div>`;
   }
   const tel=o.phone.replace(/^0/,"964");
@@ -336,6 +338,10 @@ function bind(){
     const {error}=await savePays(o,arr);if(error){er.textContent=/payments|paid_iqd/.test(error.message)?"ميزة القبض بعدها مو مفعّلة بقاعدة البيانات.":error.message;b.disabled=false;return}await load();view()});
   A.querySelectorAll("[data-delp]").forEach(x=>x.onclick=async()=>{const [id,i]=x.dataset.delp.split(":").map(Number),o=orders.find(q=>q.id===id);if(!confirm("تحذف هذا القبض؟"))return;
     const arr=(o.payments||[]).filter((_,k)=>k!==i);await savePays(o,arr);await load();view()});
+  A.querySelectorAll("[data-ship]").forEach(b=>b.onclick=async()=>{const id=+b.dataset.ship,o=orders.find(q=>q.id===id),sh=Math.round(+$("sh"+id).value||0);
+    if(sh<0)return;b.disabled=true;
+    const tot=(+o.goods_iqd||0)+sh+(+o.comm_iqd||0)+(+o.delivery_iqd||0);
+    const {error}=await db.from("orders").update({ship_iqd:sh,total_iqd:tot}).eq("id",id);if(error){alert(error.message);b.disabled=false;return}await load();view()});
   A.querySelectorAll("[data-eta]").forEach(x=>x.onchange=async()=>{await db.from("orders").update({eta:x.value||null}).eq("id",+x.dataset.eta);await load();view()});
   A.querySelectorAll("[data-stg]").forEach(x=>x.onclick=async()=>{const [id,st]=x.dataset.stg.split(":").map(Number);await db.from("orders").update({stage:st}).eq("id",id);await load();view()});
   A.querySelectorAll("[data-on]").forEach(x=>x.onchange=async()=>{await db.from("coupons").update({active:x.checked}).eq("id",+x.dataset.on);await load();view()});
