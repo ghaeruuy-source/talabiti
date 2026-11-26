@@ -20,6 +20,12 @@
   <button type="button" data-tab="cart">السلة<span class="badge" id="cartBadge" hidden></span></button>
   <button type="button" data-tab="orders">طلباتي<span class="badge" id="ordBadge" hidden></span></button>
 </nav>
+<script>
+// الأرقام العربية (٠١٢٣) تنكتب عادي بكل خانات الأرقام وتتحول لأرقام إنكليزية
+document.addEventListener("input",e=>{const t=e.target;if(!t||!t.hasAttribute||!t.hasAttribute("data-num"))return;
+  const v=t.value.replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/[٫,]/g,".").replace(/[^0-9.\-]/g,"");
+  if(v!==t.value){const p=t.selectionStart;t.value=v;try{t.setSelectionRange(p,p)}catch{}}},true);
+</script>
 <script src="config.js"></script>
 <script src="supabase.js"></script>
 <script>
@@ -242,12 +248,12 @@ function render(){
       ${draft.link?"":`<button class="btn ghost" type="button" id="dPaste">📋 الصق الرابط</button>`}
       ${C?`<label class="btn ${draft.read?"ghost":""}" for="dImg" id="dImgL" style="cursor:pointer">📷 ${draft.read?"غيّر صورة السلة":"ارفع صورة سلتك"}</label><input id="dImg" type="file" accept="image/*" hidden>
          <div id="dEst">${draft.read?readBox(draft.read):draft.readMsg?`<p class="sub">${esc(draft.readMsg)}</p>`:""}</div>
-         ${draft.read?"":`<div class="field"><label for="dCount">كم قطعة بالسلة؟</label><input id="dCount" type="number" min="1" max="200" inputmode="numeric" value="${esc(draft.count||"")}"></div>`}`
+         ${draft.read?"":`<div class="field"><label for="dCount">كم قطعة بالسلة؟</label><input id="dCount" type="text" inputmode="decimal" data-num min="1" max="200" inputmode="numeric" value="${esc(draft.count||"")}"></div>`}`
          :`<div class="field"><label for="dName">شنو القطعة؟</label><input id="dName" value="${esc(draft.name)}" placeholder="مثلاً: فستان أسود"></div>`}
       ${!C&&+draft.orig>0?`<p class="num">${+draft.sale>0&&+draft.sale<+draft.orig?`<s>${aed(draft.orig)}</s> <b>${aed(draft.sale)}</b>`:`<b>${aed(draft.orig)}</b>`} <span class="sub">تقريباً</span></p>`:""}
       ${C?"":`<div class="two">
         <div class="field"><label for="dSize">القياس واللون</label><input id="dSize" value="${esc(draft.size)}" placeholder="M، أسود"></div>
-        <div class="field"><label for="dQty">العدد</label><input id="dQty" type="number" min="1" max="20" value="${esc(draft.qty||1)}"></div>
+        <div class="field"><label for="dQty">العدد</label><input id="dQty" type="text" inputmode="decimal" data-num min="1" max="20" value="${esc(draft.qty||1)}"></div>
       </div>`}
       ${C?"":`<p class="sub">حامد يتأكد من القطعة ويطلعلك السعر النهائي بالدينار.</p>`}
       <p class="err" id="err"></p>

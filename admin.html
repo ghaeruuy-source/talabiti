@@ -73,6 +73,12 @@ body{font-size:16px}
 <body>
 <header class="bar"><div class="container page"><b>لوحة طلبيتي</b><button class="btn sm ghost" type="button" id="logout" hidden>خروج</button></div></header>
 <main class="container page" id="app"></main>
+<script>
+// الأرقام العربية (٠١٢٣) تنكتب عادي بكل خانات الأرقام وتتحول لأرقام إنكليزية
+document.addEventListener("input",e=>{const t=e.target;if(!t||!t.hasAttribute||!t.hasAttribute("data-num"))return;
+  const v=t.value.replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/[٫,]/g,".").replace(/[^0-9.\-]/g,"");
+  if(v!==t.value){const p=t.selectionStart;t.value=v;try{t.setSelectionRange(p,p)}catch{}}},true);
+</script>
 <script src="config.js"></script>
 <script src="supabase.js"></script>
 <script>
@@ -113,10 +119,10 @@ function preqHTML(){if(!preqs.length)return"";
   return`<div class="card" style="border:2px solid var(--accent)"><h3>⚡ طلبات تسعير (${preqs.length})</h3><p class="hint">الزبون ينتظر بالصفحة. افتح السلة، اكتب المجموع وعدد القطع، والسعر يطلعله فوراً.</p>
   ${preqs.map(r=>`<div class="basket" style="display:grid;gap:8px"><span><b>#${r.id}</b> <span class="hint">${new Date(r.created_at).toLocaleTimeString("ar-IQ",{hour:"numeric",minute:"2-digit"})}${r.phone?` · <bdi class="ltr">${esc(r.phone)}</bdi>`:""}</span></span>
     <a class="btn sm" href="${esc(r.link)}" target="_blank" rel="noopener">🛍️ افتح السلة بشي ان</a>
-    <div class="row"><div class="field"><label for="pa${r.id}">مجموع السلة</label><input id="pa${r.id}" type="number" step="any" inputmode="decimal"></div>
+    <div class="row"><div class="field"><label for="pa${r.id}">مجموع السلة</label><input id="pa${r.id}" type="text" inputmode="decimal" data-num step="any" inputmode="decimal"></div>
       <div class="field" style="min-width:90px;max-width:120px"><label for="pcu${r.id}">العملة</label><select id="pcu${r.id}"><option value="USD"${qCur()==="USD"?" selected":""}>دولار</option><option value="IQD"${qCur()==="IQD"?" selected":""}>دينار</option></select></div>
       
-      <div class="field" style="max-width:110px"><label for="pp${r.id}">عدد القطع</label><input id="pp${r.id}" type="number" min="1" inputmode="numeric"></div></div>
+      <div class="field" style="max-width:110px"><label for="pp${r.id}">عدد القطع</label><input id="pp${r.id}" type="text" inputmode="decimal" data-num min="1" inputmode="numeric"></div></div>
     <p class="err" id="pe_r${r.id}"></p>
     <div class="row"><button class="btn" style="flex:2" type="button" data-setp="${r.id}">أرسل السعر للزبون</button><button class="btn ghost" style="flex:1" type="button" data-rejp="${r.id}">ما ينسعّر</button></div></div>`).join("")}</div>`}
 function view(){
@@ -148,7 +154,7 @@ function view(){
     <div class="card"><h3>سجّل مصروف</h3>
       <div class="row"><div class="field" style="flex:2"><label for="xTitle">شنو المصروف؟</label><input id="xTitle" placeholder="مثلاً: شحنة الأسبوع"></div>
         <div class="field"><label for="xCat">النوع (اختار أو اكتب نوع جديد)</label><input id="xCat" list="xCats" value="${esc(cats[0])}" autocomplete="off"><datalist id="xCats">${cats.map(c=>`<option value="${esc(c)}">`).join("")}</datalist></div></div>
-      <div class="row"><div class="field"><label for="xAmt">المبلغ</label><input id="xAmt" type="number" inputmode="decimal" step="any"></div>
+      <div class="row"><div class="field"><label for="xAmt">المبلغ</label><input id="xAmt" type="text" inputmode="decimal" data-num inputmode="decimal" step="any"></div>
         <div class="field" style="max-width:130px"><label for="xCur">العملة</label><select id="xCur"><option value="IQD">دينار</option><option value="USD">دولار</option></select></div></div>
       <p class="hint" id="xConv"></p>
       <div class="row">
@@ -159,18 +165,18 @@ function view(){
   else body=`<div class="card"><h3>عروض اليوم</h3><p class="hint">الكوبونات الفعّالة تطلع للزبون بالموقع، وأحسن كوبون ينحسب وحده بالتسعير. استعمل نفس الكود بشي ان من تشتري.</p>
       ${coupons.length?coupons.map(c=>`<div class="citem"><span><b class="ltr">${esc(c.code)}</b> · خصم ${+c.pct}% ${+c.min_aed?`· فوق ${+c.min_aed} درهم`:"· على أي طلب"}</span><span style="display:flex;gap:10px;align-items:center"><label><input type="checkbox" data-on="${c.id}"${c.active?" checked":""}> فعّال</label><button class="btn sm ghost" type="button" data-del="${c.id}">احذف</button></span></div>`).join(""):`<p class="hint">ماكو كوبونات بعد.</p>`}
       <h3 style="margin-top:8px">كوبون جديد</h3>
-      <div class="row"><div class="field"><label for="nCode">الكود (مثل ما بشي ان)</label><input id="nCode" class="ltr"></div><div class="field"><label for="nPct">الخصم ٪</label><input id="nPct" type="number" value="20"></div><div class="field"><label for="nMin">إذا الطلب فوق (درهم)</label><input id="nMin" type="number" value="0"></div></div>
+      <div class="row"><div class="field"><label for="nCode">الكود (مثل ما بشي ان)</label><input id="nCode" class="ltr"></div><div class="field"><label for="nPct">الخصم ٪</label><input id="nPct" type="text" inputmode="decimal" data-num value="20"></div><div class="field"><label for="nMin">إذا الطلب فوق (درهم)</label><input id="nMin" type="text" inputmode="decimal" data-num value="0"></div></div>
       <button class="btn" type="button" id="addC">أضف الكوبون</button></div>
     <div class="card"><h3>الأسعار</h3>
       <div class="row">
         <div class="field"><label for="sCur">سعر الصرف حسب</label><select id="sCur"><option value="AED"${curPref()==="AED"?" selected":""}>الدرهم</option><option value="USD"${curPref()==="USD"?" selected":""}>الدولار</option></select></div>
-        <div class="field"><label for="sRate" id="sRateL">${curPref()==="USD"?"الدولار بكم دينار؟":"الدرهم بكم دينار؟"}</label><input id="sRate" type="number" inputmode="decimal" step="any" value="${rateShown()}"></div>
-        <div class="field"><label for="sComm">ربحك (عمولة ٪)</label><input id="sComm" type="number" value="${+settings?.commission_pct}"></div></div>
+        <div class="field"><label for="sRate" id="sRateL">${curPref()==="USD"?"الدولار بكم دينار؟":"الدرهم بكم دينار؟"}</label><input id="sRate" type="text" inputmode="decimal" data-num inputmode="decimal" step="any" value="${rateShown()}"></div>
+        <div class="field"><label for="sComm">ربحك (عمولة ٪)</label><input id="sComm" type="text" inputmode="decimal" data-num value="${+settings?.commission_pct}"></div></div>
       <div class="row">
-        <div class="field"><label for="sShip">شحن جوي ✈️ لكل كيلو (دينار)</label><input id="sShip" type="number" value="${+settings?.ship_per_kg}"></div>
-        <div class="field"><label for="sSea">شحن بحري 🚢 لكل متر مكعب (دينار)</label><input id="sSea" type="number" value="${settings&&"ship_sea_per_cbm" in settings?+settings.ship_sea_per_cbm:""}" ${settings&&"ship_sea_per_cbm" in settings?"":"disabled placeholder=\"يتفعّل بعد تحديث قاعدة البيانات\""}></div>
-        <div class="field"><label for="sDel">التوصيل (دينار)</label><input id="sDel" type="number" value="${+settings?.delivery}"></div>
-        <div class="field"><label for="sDep">العربون ٪</label><input id="sDep" type="number" value="${+settings?.deposit_pct}"></div></div>
+        <div class="field"><label for="sShip">شحن جوي ✈️ لكل كيلو (دينار)</label><input id="sShip" type="text" inputmode="decimal" data-num value="${+settings?.ship_per_kg}"></div>
+        <div class="field"><label for="sSea">شحن بحري 🚢 لكل متر مكعب (دينار)</label><input id="sSea" type="text" inputmode="decimal" data-num value="${settings&&"ship_sea_per_cbm" in settings?+settings.ship_sea_per_cbm:""}" ${settings&&"ship_sea_per_cbm" in settings?"":"disabled placeholder=\"يتفعّل بعد تحديث قاعدة البيانات\""}></div>
+        <div class="field"><label for="sDel">التوصيل (دينار)</label><input id="sDel" type="text" inputmode="decimal" data-num value="${+settings?.delivery}"></div>
+        <div class="field"><label for="sDep">العربون ٪</label><input id="sDep" type="text" inputmode="decimal" data-num value="${+settings?.deposit_pct}"></div></div>
       <h3 style="margin-top:8px">الصفحة</h3>
       <div class="field"><label for="sName">اسم الصفحة</label><input id="sName" value="${esc(settings?.shop_name)}"></div>
       <div class="field"><label for="sWa">رقم الواتساب</label><input id="sWa" class="ltr" value="${esc(settings?.whatsapp)}"></div>
@@ -258,12 +264,12 @@ function card(o){
   let act="";
   if(o.status==="pending"){
     const qty=o.items.reduce((a,i)=>a+(i.basket?+i.count||1:+i.qty),0);
-    act=`<h4>التسعير</h4><div class="row"><div class="field"><label for="sa${o.id}">مجموع السلة بعد الخصم</label><input id="sa${o.id}" type="number" step="any" inputmode="decimal" value="${+o.sale_aed?fromAED(+o.sale_aed,qCur()):""}" placeholder="من سلة الزبون"></div>
+    act=`<h4>التسعير</h4><div class="row"><div class="field"><label for="sa${o.id}">مجموع السلة بعد الخصم</label><input id="sa${o.id}" type="text" inputmode="decimal" data-num step="any" inputmode="decimal" value="${+o.sale_aed?fromAED(+o.sale_aed,qCur()):""}" placeholder="من سلة الزبون"></div>
       <div class="field" style="min-width:90px;max-width:120px"><label for="sc${o.id}">العملة</label><select id="sc${o.id}" data-sc="${o.id}"><option value="USD"${qCur()==="USD"?" selected":""}>دولار</option><option value="IQD"${qCur()==="IQD"?" selected":""}>دينار</option></select></div>
       ${o.ship_mode==="sea"?`<input id="k${o.id}" type="hidden" value="0"></div>
-      <div class="row"><div class="field"><label for="L${o.id}">🚢 الطول (سم)</label><input id="L${o.id}" type="number" inputmode="decimal" step="any" placeholder="40"></div>
-        <div class="field"><label for="W${o.id}">العرض (سم)</label><input id="W${o.id}" type="number" inputmode="decimal" step="any" placeholder="30"></div>
-        <div class="field"><label for="H${o.id}">الارتفاع (سم)</label><input id="H${o.id}" type="number" inputmode="decimal" step="any" placeholder="20"></div></div>`
+      <div class="row"><div class="field"><label for="L${o.id}">🚢 الطول (سم)</label><input id="L${o.id}" type="text" inputmode="decimal" data-num inputmode="decimal" step="any" placeholder="40"></div>
+        <div class="field"><label for="W${o.id}">العرض (سم)</label><input id="W${o.id}" type="text" inputmode="decimal" data-num inputmode="decimal" step="any" placeholder="30"></div>
+        <div class="field"><label for="H${o.id}">الارتفاع (سم)</label><input id="H${o.id}" type="text" inputmode="decimal" data-num inputmode="decimal" step="any" placeholder="20"></div></div>`
       :`<input id="k${o.id}" type="hidden" value="0"></div><p class="hint">✈️ الشحن ما ينحسب هسه. لمن يوصل الطلب للعراق تكتب الشحن الفعلي بالطلب وينضاف لحساب الزبون.</p>`}
       <div class="pv" id="pv${o.id}" data-pv="${o.id}"></div>
       <div class="row"><button class="btn" style="flex:2" type="button" data-q="${o.id}">أرسل السعر للزبون</button><button class="btn ghost" style="flex:1" type="button" data-rej="${o.id}">ارفض</button></div>`;
@@ -275,13 +281,13 @@ function card(o){
         <small>المطلوب ${iqd(o.total_iqd)} · المقبوض ${iqd(paid)} · ربحك ${iqd(o.comm_iqd)}</small></div>${cpn}
       ${pays.length?`<div class="pays">${pays.map((q,i)=>`<div class="pay"><b class="num">${iqd(q.amount)}</b><span class="hint">${esc(q.date||"")}${q.note?` · ${esc(q.note)}`:""}</span><button type="button" data-delp="${o.id}:${i}" aria-label="احذف">✕</button></div>`).join("")}</div>`:""}
       <details class="addpay"${pays.length?"":" open"}><summary>＋ سجّل قبض جديد</summary>
-        <div class="row"><div class="field" style="flex:2"><label for="px${o.id}">المبلغ</label><input id="px${o.id}" type="number" inputmode="decimal" step="any"></div>
+        <div class="row"><div class="field" style="flex:2"><label for="px${o.id}">المبلغ</label><input id="px${o.id}" type="text" inputmode="decimal" data-num inputmode="decimal" step="any"></div>
           <div class="field" style="min-width:90px"><label for="pc${o.id}">العملة</label><select id="pc${o.id}"><option value="IQD">دينار</option><option value="USD">دولار</option></select></div></div>
         <div class="field"><label for="pn${o.id}">ملاحظة (اختياري)</label><input id="pn${o.id}" placeholder="عربون، تحويل..."></div>
         <p class="err" id="pe${o.id}"></p><button class="btn" type="button" data-pay="${o.id}">سجّل قبض</button></details>`}
     if(o.status==="accepted")act+=`
       <h4>وين وصل الطلب؟</h4><div class="steps">${STAGES.map((s,i)=>`<button type="button" class="${i<=o.stage&&(o.stage>0||o.deposit_paid||+o.paid_iqd>0)?"done":""}" data-stg="${o.id}:${i}">${s}</button>`).join("")}</div>
-      ${o.ship_mode==="sea"?"":`<div class="row"><div class="field"><label for="sh${o.id}">✈️ الشحن الفعلي (دينار)${+o.ship_iqd>0?"":" — ما انضاف بعد"}</label><input id="sh${o.id}" type="number" inputmode="numeric" step="250" value="${+o.ship_iqd||""}" placeholder="اللي حاسبتك بيه شركة الشحن"></div>
+      ${o.ship_mode==="sea"?"":`<div class="row"><div class="field"><label for="sh${o.id}">✈️ الشحن الفعلي (دينار)${+o.ship_iqd>0?"":" — ما انضاف بعد"}</label><input id="sh${o.id}" type="text" inputmode="decimal" data-num inputmode="numeric" step="250" value="${+o.ship_iqd||""}" placeholder="اللي حاسبتك بيه شركة الشحن"></div>
         <button class="btn" style="flex:0 0 auto;width:auto;align-self:end" type="button" data-ship="${o.id}">${+o.ship_iqd>0?"حدّث الشحن":"أضف للزبون"}</button></div>`}
       <div class="row"><div class="field" style="max-width:220px"><label for="eta${o.id}">يوصل للزبون تقريباً</label><input id="eta${o.id}" type="date" data-eta="${o.id}" value="${o.eta||""}"></div></div>`;
   }
