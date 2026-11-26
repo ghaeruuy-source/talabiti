@@ -179,12 +179,12 @@ function render(){
     if(calcStage==="priced"&&preq&&preq.priced){
       const P=preq.priced,e=estimate(P.total_aed,P.pieces,"air"),dep=Math.round(e.total*(+settings.deposit_pct||0)/100/1000)*1000;
       el.innerHTML=`<div class="pcal">
-        <div class="bigp"><span class="lbl">🛍️ سلتك · ${P.pieces} قطعة</span><span class="amt num">${iqd(e.total)}</span><span class="inc">شامل البضاعة والتوصيل · الشحن ينضاف لمن توصل طلبيتك للعراق</span></div>
         <div class="rowbox">
           <div class="q"><span>البضاعة${e.c?` <small class="sub">(بعد كوبون ${esc(e.c.code)} ${+e.c.pct}%)</small>`:""}</span><span class="num">${iqd(e.goods)}</span></div>
           <div class="q"><span>الشحن للعراق ✈️</span><span class="sub">ينحسب لمن يوصل العراق</span></div>
           <div class="q"><span>خدمة الطلب</span><span class="num">${iqd(e.comm)}</span></div>
           <div class="q"><span>التوصيل</span><span class="num">${iqd(e.del)}</span></div></div>
+        <div class="bigp"><span class="lbl">🛍️ سلتك · ${P.pieces} قطعة</span><span class="amt num">${iqd(e.total)}</span><span class="inc">شامل البضاعة والتوصيل · الشحن ينضاف لمن توصل طلبيتك للعراق</span></div>
         ${e.saved>0?`<div class="saved">وفّرت ${iqd(e.saved)} بالكوبون</div>`:""}
         ${dep>0?`<div class="dep"><span>🏷️ العربون المطلوب</span><span class="num">${iqd(dep)}</span></div>`:""}
         <button class="btn" type="button" id="qOrder">اطلبها هسه ←</button>
@@ -197,12 +197,12 @@ function render(){
     if(calcStage==="result"&&calcData.read){
       const R=calcData.read,e=estimate(R.total_aed,R.pieces,"air"),dep=Math.round(e.total*(+settings.deposit_pct||0)/100/1000)*1000;
       el.innerHTML=`<div class="pcal">
-        <div class="bigp"><span class="lbl">🛍️ سلتك · ${R.pieces} قطعة</span><span class="amt num">${iqd(e.total)}</span><span class="inc">شامل البضاعة والتوصيل · الشحن ينضاف لمن توصل طلبيتك للعراق</span></div>
         <div class="rowbox">
           <div class="q"><span>البضاعة${e.c?` <small class="sub">(بعد كوبون ${esc(e.c.code)} ${+e.c.pct}%)</small>`:""}</span><span class="num">${iqd(e.goods)}</span></div>
           <div class="q"><span>الشحن للعراق ✈️</span><span class="sub">ينحسب لمن يوصل العراق</span></div>
           <div class="q"><span>خدمة الطلب</span><span class="num">${iqd(e.comm)}</span></div>
           <div class="q"><span>التوصيل</span><span class="num">${iqd(e.del)}</span></div></div>
+        <div class="bigp"><span class="lbl">🛍️ سلتك · ${R.pieces} قطعة</span><span class="amt num">${iqd(e.total)}</span><span class="inc">شامل البضاعة والتوصيل · الشحن ينضاف لمن توصل طلبيتك للعراق</span></div>
         ${e.saved>0?`<div class="saved">وفّرت ${iqd(e.saved)} بالكوبون</div>`:""}
         ${dep>0?`<div class="dep"><span>🏷️ العربون المطلوب</span><span class="num">${iqd(dep)}</span></div>`:""}
         <p class="sub" style="text-align:center">قرينا من صورتك: ${R.pieces} قطعة. إذا الرقم غلط ارجع وارفع صورة أوضح.</p>
