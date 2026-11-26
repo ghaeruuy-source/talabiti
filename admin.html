@@ -110,7 +110,7 @@ async function load(){
 function preqHTML(){if(!preqs.length)return"";
   return`<div class="card" style="border:2px solid var(--accent)"><h3>⚡ طلبات تسعير (${preqs.length})</h3><p class="hint">الزبون ينتظر بالصفحة. افتح السلة، اكتب المجموع وعدد القطع، والسعر يطلعله فوراً.</p>
   ${preqs.map(r=>`<div class="basket" style="display:grid;gap:8px"><span><b>#${r.id}</b> <span class="hint">${new Date(r.created_at).toLocaleTimeString("ar-IQ",{hour:"numeric",minute:"2-digit"})}${r.phone?` · <bdi class="ltr">${esc(r.phone)}</bdi>`:""}</span></span>
-    <a class="btn sm ghost" href="${esc(r.link)}" target="_blank" rel="noopener">🛍️ افتح السلة بشي ان</a>
+    <a class="btn sm" href="${esc(r.link)}" target="_blank" rel="noopener">🛍️ افتح السلة بشي ان</a>
     <div class="row"><div class="field"><label for="pa${r.id}">مجموع السلة بالدولار $</label><input id="pa${r.id}" type="number" step="0.01" inputmode="decimal"></div>
       
       <div class="field" style="max-width:110px"><label for="pp${r.id}">عدد القطع</label><input id="pp${r.id}" type="number" min="1" inputmode="numeric"></div></div>
