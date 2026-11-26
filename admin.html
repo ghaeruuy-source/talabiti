@@ -91,7 +91,7 @@ const curPref=()=>{try{return localStorage.getItem("cur")==="USD"?"USD":"AED"}ca
 const rateShown=()=>{const r=+settings?.rate_aed||0;return curPref()==="USD"?Math.round(r*USD_AED):r};
 let adminEmail="";
 let q="",rp="month",rFrom="",rTo="",stmtPhone="";
-let orders=[],coupons=[],expenses=[],expOk=false,settings=null,filter="open",tab="orders";
+let orders=[],coupons=[],expenses=[],expOk=false,settings=null,filter="open",tab="orders",preqs=[],waStatus=null;
 
 function loginView(msg=""){
   $("app").innerHTML=`<div class="card" style="max-width:420px;margin:40px auto"><h2>تسجيل دخول</h2>
@@ -104,15 +104,26 @@ function loginView(msg=""){
 async function load(){
   const [o,c,s,e]=await Promise.all([db.from("orders").select("*").order("created_at",{ascending:false}).limit(300),db.from("coupons").select("*").order("created_at"),db.from("settings").select("*").eq("id",1).single(),db.from("expenses").select("*").order("spent_on",{ascending:false}).order("id",{ascending:false}).limit(500)]);
   orders=o.data||[];coupons=c.data||[];settings=s.data;expOk=!e.error;expenses=e.data||[];
+  const pr=await db.from("price_requests").select("*").eq("status","pending").order("created_at",{ascending:true}).limit(100);preqs=pr.data||[];
 }
+// طلبات التسعير السريع: الزبون لصق رابط سلته وينتظر السعر
+function preqHTML(){if(!preqs.length)return"";
+  return`<div class="card" style="border:2px solid var(--accent)"><h3>⚡ طلبات تسعير (${preqs.length})</h3><p class="hint">الزبون ينتظر بالصفحة. افتح السلة، اكتب المجموع وعدد القطع، والسعر يطلعله فوراً.</p>
+  ${preqs.map(r=>`<div class="basket" style="display:grid;gap:8px"><span><b>#${r.id}</b> <span class="hint">${new Date(r.created_at).toLocaleTimeString("ar-IQ",{hour:"numeric",minute:"2-digit"})}${r.phone?` · <bdi class="ltr">${esc(r.phone)}</bdi>`:""}</span></span>
+    <a class="btn sm ghost" href="${esc(r.link)}" target="_blank" rel="noopener">🛍️ افتح السلة بشي ان</a>
+    <div class="row"><div class="field"><label for="pa${r.id}">المجموع بعد الخصم</label><input id="pa${r.id}" type="number" step="0.01" inputmode="decimal"></div>
+      <div class="field" style="min-width:90px;max-width:120px"><label for="pcu${r.id}">العملة</label><select id="pcu${r.id}"><option value="USD"${qCur()==="USD"?" selected":""}>دولار</option><option value="AED"${qCur()==="AED"?" selected":""}>درهم</option></select></div>
+      <div class="field" style="max-width:110px"><label for="pp${r.id}">عدد القطع</label><input id="pp${r.id}" type="number" min="1" inputmode="numeric"></div></div>
+    <p class="err" id="pe_r${r.id}"></p>
+    <div class="row"><button class="btn" style="flex:2" type="button" data-setp="${r.id}">أرسل السعر للزبون</button><button class="btn ghost" style="flex:1" type="button" data-rejp="${r.id}">ما ينسعّر</button></div></div>`).join("")}</div>`}
 function view(){
   let pend=0,sales=0,profit=0;
   orders.forEach(o=>{if(o.status==="pending")pend++;if(o.status==="accepted"){sales+=+o.total_iqd;profit+=+o.comm_iqd}});
   const qq=q.trim().toLowerCase();
   const list=orders.filter(o=>!qq||(o.customer_name+" "+o.phone+" #"+o.id).toLowerCase().includes(qq)).filter(o=>filter==="all"||(filter==="open"?["pending","quoted"].includes(o.status)||(o.status==="accepted"&&o.stage<4):filter==="done"?o.status==="accepted"&&o.stage>=4:o.status===filter));
-  const T=[["orders","الطلبات",pend],["expenses","المصاريف",0],["reports","التقارير",0],["settings","الإعدادات",0]];
+  const T=[["orders","الطلبات",pend+preqs.length],["expenses","المصاريف",0],["reports","التقارير",0],["settings","الإعدادات",0]];
   let body="";
-  if(tab==="orders")body=`
+  if(tab==="orders")body=`${preqHTML()}
     <div class="kpis">
       <div class="kpi hi"><span>ربحك</span><b class="num">${iqd(profit)}</b></div>
       <div class="kpi"><span>مبيعات مأكدة</span><b class="num">${iqd(sales)}</b></div>
@@ -163,6 +174,12 @@ function view(){
       <div class="field"><label for="sUrl">رابط شي ان</label><input id="sUrl" class="ltr" value="${esc(settings?.shein_url)}"></div>
       <p class="hint">الأسعار بشي ان الإمارات بالدرهم. إذا اخترت الدولار، الموقع يحوله للدرهم بالسعر الثابت (١ دولار = ٣.٦٧٢٥ درهم) وبعدها للدينار.</p><p class="sub" id="sMsg"></p>
       <button class="btn" type="button" id="saveS">احفظ</button></div>
+    <div class="card"><h3>🔔 إشعار واتساب</h3>
+      <p class="hint">${waStatus?`✓ مفعّل: يوصل إشعار على <b class="ltr">+${esc(waStatus)}</b> بكل طلب تسعير وكل طلب جديد.`:"يوصلك إشعار واتساب بكل طلب تسعير وكل طلب جديد. للتفعيل (مرة وحدة):"}</p>
+      ${waStatus?"":`<ol class="hint" style="padding-inline-start:18px;margin:0"><li>افتح <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">صفحة CallMeBot</a> وخذ رقمهم المكتوب هناك، واحفظه بأسماء الموبايل اللي يستلم الإشعارات</li><li>من واتساب نفس الموبايل دزله رسالة: <b class="ltr">I allow callmebot to send me messages</b></li><li>يرجعلك رد بيه <b>apikey</b> (رقم). اكتبه هنا ويا رقمك</li></ol>`}
+      <div class="row"><div class="field"><label for="wPh">رقم الواتساب اللي يستلم</label><input id="wPh" class="ltr" inputmode="tel" placeholder="9647xxxxxxxxx" value="${esc(waStatus||"")}"></div>
+        <div class="field"><label for="wKey">apikey</label><input id="wKey" class="ltr" inputmode="numeric" autocomplete="off" placeholder="${waStatus?"••••••":"123456"}"></div></div>
+      <p class="sub" id="wMsg"></p><div class="row"><button class="btn" style="flex:2" type="button" id="saveW">احفظ وجرّب</button>${waStatus?`<button class="btn ghost" style="flex:1" type="button" id="offW">وقّف الإشعار</button>`:""}</div></div>
     <div class="card"><h3>حساب الدخول</h3>
       <p class="hint">الإيميل الحالي: <b class="ltr">${esc(adminEmail)}</b></p>
       <div class="field"><label for="aMail">إيميل جديد (اختياري)</label><input id="aMail" type="email" class="ltr" autocomplete="off"></div>
@@ -296,6 +313,19 @@ function bind(){
     const sea=!!$("L"+id),cbm=cbmOf(id);if(sea&&!(cbm>0)){alert("اكتب الطول والعرض والارتفاع للشحنة البحرية.");return}
     const {error}=await db.rpc("quote_order",sea?{p_id:id,p_kg:0,p_sale_aed:Math.round(saleAED(id)*100)/100||null,p_cbm:cbm}:{p_id:id,p_kg:+$("k"+id).value||0,p_sale_aed:Math.round(saleAED(id)*100)/100||null});
     if(error){alert(error.message)}await load();view();});
+  A.querySelectorAll("[data-setp]").forEach(b=>b.onclick=async()=>{const id=+b.dataset.setp,er=$("pe_r"+id),v=+$("pa"+id).value||0,usd=$("pcu"+id).value==="USD",n=Math.round(+$("pp"+id).value||0);
+    if(!(v>0)||!(n>0)){er.textContent="اكتب المجموع وعدد القطع.";return}
+    try{localStorage.setItem("qcur",$("pcu"+id).value)}catch{}
+    b.disabled=true;const {error}=await db.rpc("set_price",{p_id:id,p_total_aed:Math.round((usd?v*USD_AED:v)*100)/100,p_pieces:n});
+    if(error){er.textContent=error.message;b.disabled=false;return}await load();view()});
+  A.querySelectorAll("[data-rejp]").forEach(b=>b.onclick=async()=>{const note=prompt("سبب (يطلع للزبون، اختياري):","الرابط ما ينفتح، تأكد منه وأرسله مرة ثانية.");if(note===null)return;
+    await db.from("price_requests").update({status:"rejected",admin_note:note}).eq("id",+b.dataset.rejp);await load();view()});
+  if($("saveW"))$("saveW").onclick=async()=>{const m=$("wMsg"),ph=$("wPh").value.replace(/\D/g,"").replace(/^0(?=7)/,"964"),k=$("wKey").value.trim();m.className="err";
+    if(!/^9647\d{9}$/.test(ph)){m.textContent="اكتب الرقم بالصيغة 9647xxxxxxxxx.";return}
+    if(!k){m.textContent="اكتب الـ apikey اللي وصلك.";return}
+    const {error}=await db.rpc("set_wa_alert",{p_phone:ph,p_key:k});if(error){m.textContent=error.message;return}
+    await db.rpc("wa_test");waStatus=ph;view();const n=$("wMsg");if(n){n.className="sub";n.textContent="انحفظ ✓ ودزّينا رسالة تجربة، شوف الواتساب."}};
+  if($("offW"))$("offW").onclick=async()=>{await db.rpc("set_wa_alert",{p_phone:"",p_key:""});waStatus=null;view()};
   A.querySelectorAll("[data-rej]").forEach(b=>b.onclick=async()=>{await db.from("orders").update({status:"rejected"}).eq("id",+b.dataset.rej);await load();view()});
   const savePays=async(o,arr)=>{const paid=arr.reduce((x,q)=>x+ +q.amount,0);
     return db.from("orders").update({payments:arr,paid_iqd:paid,deposit_paid:paid>0&&paid>=(+o.deposit_iqd||0)}).eq("id",o.id)};
@@ -343,9 +373,9 @@ function bind(){
   if($("saveS"))$("saveS").onclick=async()=>{const {error}=await db.from("settings").update({shop_name:$("sName").value.trim(),whatsapp:$("sWa").value.replace(/\D/g,"").replace(/^0(?=7)/,"964"),shein_url:$("sUrl").value.trim(),rate_aed:Math.round((($("sCur").value==="USD"?+$("sRate").value/USD_AED:+$("sRate").value))*10000)/10000,ship_per_kg:+$("sShip").value,...("ship_sea_per_cbm" in (settings||{})?{ship_sea_per_cbm:+$("sSea").value}:{}),commission_pct:+$("sComm").value,delivery:+$("sDel").value,deposit_pct:+$("sDep").value,updated_at:new Date().toISOString()}).eq("id",1);$("sMsg").textContent=error?error.message:"انحفظت ✓"};
 }
 let unseen=0;const baseTitle=document.title;
-function newOrderAlert(o){unseen++;document.title=`(${unseen}) طلب جديد · ${baseTitle}`;
+function newOrderAlert(o,txt){unseen++;document.title=`(${unseen}) طلب جديد · ${baseTitle}`;
   try{const c=new (window.AudioContext||window.webkitAudioContext)(),g=c.createGain();g.connect(c.destination);g.gain.value=.15;[880,1175].forEach((f,i)=>{const x=c.createOscillator();x.frequency.value=f;x.connect(g);x.start(c.currentTime+i*.18);x.stop(c.currentTime+i*.18+.16)})}catch{}
-  const b=document.createElement("div");b.className="toast";b.style.cssText="position:fixed;top:64px;inset-inline:16px;z-index:20;text-align:center;font-weight:700";b.textContent=`🔔 طلب جديد من ${o&&o.customer_name||"زبون"}`;document.body.appendChild(b);setTimeout(()=>b.remove(),6000)}
+  const b=document.createElement("div");b.className="toast";b.style.cssText="position:fixed;top:64px;inset-inline:16px;z-index:20;text-align:center;font-weight:700";b.textContent=txt||`🔔 طلب جديد من ${o&&o.customer_name||"زبون"}`;document.body.appendChild(b);setTimeout(()=>b.remove(),6000)}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden){unseen=0;document.title=baseTitle}});
 async function boot(){
   if(!db){$("app").innerHTML=`<p class="err">الموقع بعده مو مربوط بقاعدة البيانات.</p>`;return}
@@ -354,7 +384,8 @@ async function boot(){
   const {data:adm}=await db.from("admins").select("user_id").eq("user_id",session.user.id).maybeSingle();
   if(!adm){loginView("هذا الحساب مو مفعّل كمدير بعد.");return}
   adminEmail=session.user.email||"";$("logout").hidden=false;$("logout").onclick=async()=>{await db.auth.signOut();boot()};
-  await load();view();
+  await load();{const {data}=await db.rpc("wa_alert_status");waStatus=data||null}view();
+  db.channel("preqs").on("postgres_changes",{event:"*",schema:"public",table:"price_requests"},async(e)=>{await load();view();if(e.eventType==="INSERT")newOrderAlert(null,"⚡ طلب تسعير جديد، الزبون ينتظر")}).subscribe();
   db.channel("orders").on("postgres_changes",{event:"*",schema:"public",table:"orders"},async(e)=>{await load();view();if(e.eventType==="INSERT")newOrderAlert(e.new)}).subscribe();
 }
 boot();

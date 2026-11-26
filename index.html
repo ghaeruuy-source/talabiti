@@ -35,6 +35,9 @@ let settings={rate_aed:410,shop_name:"طلبيتي",shein_url:"https://ar.shein.
 let cart=store.get("cart",[]),me=store.get("me",{name:"",phone:"",city:"",address:""}),codes=store.get("codes",[]);
 let tab="home",flash="",draft={},shipMode=store.get("ship","air");
 let calcStage="form",calcData={},calcErr="";
+// طلب تسعير سريع: الزبون يلصق الرابط، حامد يسعّر، والسعر يطلع هنا لحاله
+let preq=store.get("preq",null),pollT=null;
+if(preq&&preq.code)calcStage=preq.priced?"priced":"waiting";
 
 // رابط مشارك من تطبيق شي ان (أندرويد) أو ?link=
 const qp=new URLSearchParams(location.search);
@@ -87,6 +90,35 @@ async function runQuote(){
   else{calcStage="form";calcErr=res&&res.nokey?"التسعير الفوري مو مفعّل بعد. أضف سلتك من «أضف قطعة» وصاحب الصفحة يسعّرها.":(res&&res.reason)||"ما كدرنا نقرا صورة سلتك. جرّب سكرين شوت أوضح وبيه المجموع."}
   if(tab==="calc")render();
 }
+async function requestPrice(){
+  calcData.link=(($("qLink")&&$("qLink").value)||calcData.link||"").trim();
+  const lm=calcData.link.match(LINK_RE);
+  if(!lm){calcErr="الصق رابط سلتك من شي ان.";render();return}
+  if(!db){calcErr="الموقع بعده مو مربوط، جرّب بعدين.";render();return}
+  const ph=(($("qPhone")&&$("qPhone").value)||"").trim();
+  if(ph&&!/^(0?7\d{9}|9647\d{9})$/.test(ph.replace(/\D/g,""))){calcErr="اكتب رقم موبايل عراقي صحيح، أو خليه فارغ.";render();return}
+  if(ph){me.phone=ph;store.set("me",me)}
+  $("qGo").disabled=true;$("qGo").textContent="دا يرسل…";
+  const {data,error}=await db.rpc("request_price",{p_link:lm[0],p_phone:ph});
+  if(error){calcErr=error.message||"صار خطأ، جرّب مرة ثانية.";render();return}
+  const row=Array.isArray(data)?data[0]:data;
+  preq={code:row.code,link:lm[0],at:Date.now()};store.set("preq",preq);
+  calcErr="";calcData={};calcStage="waiting";render();scrollTo(0,0);startPoll();
+}
+async function checkPrice(){
+  if(!db||!preq||!preq.code||preq.priced)return;
+  const {data}=await db.rpc("check_price",{p_code:preq.code});
+  const r=Array.isArray(data)?data[0]:data;
+  if(!r){preq=null;store.set("preq",null);calcStage="form";stopPoll();if(tab==="calc")render();return}
+  if(r.status==="priced"&&!r.used){preq.priced={total_aed:+r.total_aed,pieces:+r.pieces};store.set("preq",preq);calcStage="priced";stopPoll();
+    try{navigator.vibrate&&navigator.vibrate([120,60,120])}catch{}
+    document.title="✓ وصل سعر سلتك";if(tab!=="calc")tab="calc";render();scrollTo(0,0)}
+  else if(r.status==="rejected"){calcErr=r.admin_note||"ما كدرنا نسعّر هالسلة. تأكد من الرابط أو راسلنا واتساب.";preq=null;store.set("preq",null);calcStage="form";stopPoll();if(tab==="calc")render()}
+  else if(r.used){preq=null;store.set("preq",null);calcStage="form";stopPoll()}
+}
+function startPoll(){stopPoll();pollT=setInterval(checkPrice,5000)}
+function stopPoll(){if(pollT){clearInterval(pollT);pollT=null}}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&preq&&!preq.priced)checkPrice()});
 function tabs(){
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===tab));
   const cq=cart.reduce((a,c)=>a+c.qty,0);$("cartBadge").hidden=!cq;$("cartBadge").textContent=cq;
@@ -99,7 +131,7 @@ function render(){
   const notice=!db?`<p class="err">الموقع بعده مو مربوط بقاعدة البيانات.</p>`:"";
   if(tab==="home"){
     el.innerHTML=`${notice}
-      <div class="pcal"><div class="top"><span class="chip">⚡ حاسبة السعر الفورية</span><h2>شگد سعر سلتك؟</h2><p>الصق رابط سلتك وارفع صورتها، ويطلعلك السعر بالدينار شامل الشحن.</p>
+      <div class="pcal"><div class="top"><span class="chip">⚡ تسعير سريع</span><h2>شگد سعر سلتك؟</h2><p>الصق رابط سلتك بس، ويوصلك السعر بالدينار شامل الشحن خلال دقائق.</p>
         <button class="btn" type="button" id="goCalc" style="background:#fff;color:#7B1FA2;margin-top:6px">احسب سعر سلتي ←</button></div></div>
       ${IN_APP?"":`<div class="card" style="border:2px solid var(--accent)"><h3>رجعت من شي ان؟ الصق رابط القطعة أو رابط سلتك هنا</h3>
         <div class="field"><input id="hLink" class="ltr" inputmode="url" placeholder="الصق الرابط هنا" aria-label="رابط القطعة"></div>
@@ -135,6 +167,34 @@ function render(){
         <div class="steps"><div class="s on" id="qs0"><span class="n">1</span>دنقرأ سلتك…</div><div class="s" id="qs1"><span class="n">2</span>دنحسب الشحن للعراق…</div><div class="s" id="qs2"><span class="n">3</span>دنحوّل الأسعار للدينار…</div></div></div>`;
       return;
     }
+    if(calcStage==="waiting"&&preq){
+      el.innerHTML=`<div class="loader"><div class="orb">⏳</div><h3>سعرك يوصلك خلال دقائق</h3>
+        <p class="sub">وصلنا رابط سلتك، ونفتحها ونسعّرها هسه. خلي هالصفحة مفتوحة، والسعر يطلع هنا لحاله.</p><div class="bar"><i></i></div>
+        <p class="sub ltr" style="word-break:break-all;opacity:.7">${esc(preq.link)}</p>
+        ${settings.whatsapp?`<p class="sub">مستعجل؟ <a href="https://wa.me/${esc(waNum(settings.whatsapp))}?text=${encodeURIComponent("مرحبا، طلبت سعر سلة من الموقع، كود "+preq.code)}" target="_blank" rel="noopener">راسلنا واتساب</a></p>`:""}
+        <button class="btn ghost" type="button" id="qCancel">إلغاء وسلة ثانية</button></div>`;
+      $("qCancel").onclick=()=>{preq=null;store.set("preq",null);stopPoll();calcStage="form";render()};
+      if(!pollT)startPoll();
+      return;
+    }
+    if(calcStage==="priced"&&preq&&preq.priced){
+      const P=preq.priced,e=estimate(P.total_aed,P.pieces,"air"),dep=Math.round(e.total*(+settings.deposit_pct||0)/100/1000)*1000;
+      el.innerHTML=`<div class="pcal">
+        <div class="bigp"><span class="lbl">🛍️ سلتك · ${P.pieces} قطعة</span><span class="amt num">${iqd(e.total)}</span><span class="inc">السعر شامل كلشي — البضاعة والشحن والتوصيل</span></div>
+        <div class="rowbox">
+          <div class="q"><span>البضاعة${e.c?` <small class="sub">(بعد كوبون ${esc(e.c.code)} ${+e.c.pct}%)</small>`:""}</span><span class="num">${iqd(e.goods)}</span></div>
+          <div class="q"><span>الشحن للعراق ✈️</span><span class="num">${iqd(e.ship)}</span></div>
+          <div class="q"><span>خدمة الطلب</span><span class="num">${iqd(e.comm)}</span></div>
+          <div class="q"><span>التوصيل</span><span class="num">${iqd(e.del)}</span></div></div>
+        ${e.saved>0?`<div class="saved">وفّرت ${iqd(e.saved)} بالكوبون</div>`:""}
+        ${dep>0?`<div class="dep"><span>🏷️ العربون المطلوب</span><span class="num">${iqd(dep)}</span></div>`:""}
+        <button class="btn" type="button" id="qOrder">اطلبها هسه ←</button>
+        <button class="btn ghost" type="button" id="qAgain">احسب سلة ثانية</button></div>`;
+      $("qOrder").onclick=()=>{cart=cart.filter(i=>i.req!==preq.code);cart.push({link:preq.link,name:`سلة شي ان كاملة (${P.pieces} قطعة)`,size:"—",qty:1,orig:P.total_aed,sale:P.total_aed,img:"",basket:true,count:P.pieces,req:preq.code});
+        saveCart();shipMode="air";store.set("ship","air");calcStage="form";go("cart")};
+      $("qAgain").onclick=()=>{preq=null;store.set("preq",null);calcData={};calcStage="form";calcErr="";render()};
+      return;
+    }
     if(calcStage==="result"&&calcData.read){
       const R=calcData.read,e=estimate(R.total_aed,R.pieces,"air"),dep=Math.round(e.total*(+settings.deposit_pct||0)/100/1000)*1000;
       el.innerHTML=`<div class="pcal">
@@ -155,21 +215,23 @@ function render(){
       return;
     }
     el.innerHTML=`<div class="pcal">
-      <div class="top"><span class="chip">⚡ حاسبة السعر الفورية</span><h2>شگد سعر سلتك؟</h2><p>بالدينار، شامل الشحن والتوصيل.</p></div>
+      <div class="top"><span class="chip">⚡ تسعير سريع</span><h2>شگد سعر سلتك؟</h2><p>الصق رابط سلتك بس، وسعرك بالدينار (شامل الشحن والتوصيل) يوصلك هنا خلال دقائق.</p></div>
       <div class="card">
-        <div class="field"><label for="qLink">١) رابط سلتك من شي ان</label><input id="qLink" class="ltr" inputmode="url" placeholder="https://onelink.shein.com/..." value="${esc(calcData.link||"")}"></div>
+        <div class="field"><label for="qLink">رابط سلتك من شي ان</label><input id="qLink" class="ltr" inputmode="url" placeholder="https://onelink.shein.com/..." value="${esc(calcData.link||"")}"></div>
         <button class="btn ghost" type="button" id="qPaste">📋 الصق الرابط</button>
-        <label class="drop ${calcData.imgData?"has":""}" for="qImg"><span class="big">${calcData.imgData?"✓":"📷"}</span>
-          <span>${calcData.imgData?"انضافت صورة سلتك — اضغط حتى تغيّرها":"٢) صوّر سلتك (سكرين شوت) وبيها المجموع، وارفعها هنا"}</span></label>
-        <input id="qImg" type="file" accept="image/*" hidden>
+        <div class="field"><label for="qPhone">رقم موبايلك (اختياري، حتى نراسلك إذا احتجنا)</label><input id="qPhone" class="ltr" inputmode="tel" placeholder="07xx xxx xxxx" value="${esc(me.phone||"")}"></div>
+        <details ${calcData.imgData?"open":""}><summary class="sub" style="cursor:pointer">📷 عندك صورة سلتك وبيها المجموع؟ ارفعها وشوف السعر فوراً</summary>
+          <label class="drop ${calcData.imgData?"has":""}" for="qImg"><span class="big">${calcData.imgData?"✓":"📷"}</span>
+            <span>${calcData.imgData?"انضافت صورة سلتك — اضغط حتى تغيّرها":"ارفع سكرين شوت للسلة وبيها المجموع"}</span></label>
+          <input id="qImg" type="file" accept="image/*" hidden></details>
         ${calcErr?`<p class="err">${esc(calcErr)}</p>`:""}
-        <button class="btn" type="button" id="qGo">شوف السعر ←</button>
-        <p class="sub" style="text-align:center">🔒 ما نحتاج حسابك ولا الباسورد — بس رابط السلة وصورتها.</p></div>
-      <div class="card"><h3>شلون أنسخ رابط سلتي؟</h3><ol class="howto"><li>افتح تطبيق شي ان وروح للسلة</li><li>اضغط زر المشاركة ↗ واختار نسخ الرابط</li><li>الصقه فوك، وصوّر السلة وبيها المجموع</li></ol></div></div>`;
+        <button class="btn" type="button" id="qGo">${calcData.imgData?"شوف السعر ←":"اطلب السعر ←"}</button>
+        <p class="sub" style="text-align:center">🔒 ما نحتاج حسابك ولا الباسورد — بس رابط السلة.</p></div>
+      <div class="card"><h3>شلون أنسخ رابط سلتي؟</h3><ol class="howto"><li>افتح تطبيق شي ان وروح للسلة</li><li>اضغط زر المشاركة ↗ واختار نسخ الرابط</li><li>الصقه فوك واضغط «اطلب السعر»</li></ol></div></div>`;
     $("qPaste").onclick=async()=>{try{const t=await navigator.clipboard.readText(),u=t.match(LINK_RE);$("qLink").value=u?u[0]:t}catch{calcErr="المتصفح ما سمح. اضغط مطولاً بالخانة واختار لصق.";calcData.link=$("qLink").value;render()}};
     $("qImg").onchange=async()=>{const f=$("qImg").files[0];if(!f)return;calcData.link=$("qLink").value;try{calcData.imgData=await shrink(f);calcErr=""}catch{calcErr="ما كدرنا نفتح الصورة، جرّب صورة ثانية."}render()};
     $("qLink").onchange=$("qLink").onpaste=()=>setTimeout(()=>{const u=$("qLink").value.match(LINK_RE);if(u)$("qLink").value=u[0]},0);
-    $("qGo").onclick=()=>runQuote();
+    $("qGo").onclick=()=>calcData.imgData?runQuote():requestPrice();
     return;
   }
   if(tab==="add"){
@@ -225,11 +287,11 @@ function render(){
   if(tab==="cart"){
     if(!cart.length){el.innerHTML=`<p class="empty">السلة فارغة. ارجع لشي ان واختار اللي يعجبك.</p><button class="btn ghost" type="button" id="goAdd">أضف قطعة</button>`;$("goAdd").onclick=()=>go("add");return}
     const sale=cart.reduce((a,i)=>a+i.sale*i.qty,0),orig=cart.reduce((a,i)=>a+i.orig*i.qty,0),c=bestCoupon(sale);
-    const allP=cart.every(i=>i.basket&&i.read_id&&i.sale>0),pcs=cart.reduce((a,i)=>a+(i.basket?+i.count||1:i.qty),0);
+    const allP=cart.every(i=>i.basket&&(i.read_id||i.req)&&i.sale>0),pcs=cart.reduce((a,i)=>a+(i.basket?+i.count||1:i.qty),0);
     const nextC=coupons.filter(x=>+x.min_aed>sale).sort((a,b)=>a.min_aed-b.min_aed)[0];
     el.innerHTML=`${flash?`<div class="toast">${flash}</div>`:""}<h3>سلتك</h3>
       ${cart.map((i,k)=>`<div class="line"><div class="h">${i.img?`<img src="${esc(i.img)}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex:none">`:""}<b style="flex:1">${esc(i.name)}</b><button type="button" data-k="${k}" aria-label="احذف">✕</button></div>
-        ${i.basket?`<p class="sub">${i.count} قطعة</p>${i.read_id&&i.sale>0?`<p class="num"><b>${aed(i.sale)}</b></p>`:`<p class="sub">حامد يفتح سلتك ويسعّرها</p>`}</div>`:`<p class="sub">${esc(i.size)} · العدد ${i.qty}</p>${!(i.orig>0)?`<p class="sub">حامد يسعّرها</p></div>`:`
+        ${i.basket?`<p class="sub">${i.count} قطعة</p>${(i.read_id||i.req)&&i.sale>0?`<p class="num"><b>${aed(i.sale)}</b></p>`:`<p class="sub">حامد يفتح سلتك ويسعّرها</p>`}</div>`:`<p class="sub">${esc(i.size)} · العدد ${i.qty}</p>${!(i.orig>0)?`<p class="sub">حامد يسعّرها</p></div>`:`
         <p class="num">${i.sale<i.orig?`<s>${aed(i.orig*i.qty)}</s> `:""}<b>${aed(i.sale*i.qty)}</b>${i.sale<i.orig?` <span class="save">-${Math.round((1-i.sale/i.orig)*100)}%</span>`:""}</p></div>`}`}`).join("")}
       ${allP?`<h3>سعرك النهائي</h3>${estBox(estimate(sale,pcs,shipMode))}`:sale>0?`<div class="quote"><div class="q"><span>المجموع التقريبي للبضاعة</span><span class="num">${aed(sale)}</span></div>
         ${c?`<div class="q d"><span>كوبون ${esc(c.code)} (${+c.pct}%)</span><span class="num">-${aed(sale*c.pct/100)}</span></div>`:""}
@@ -263,6 +325,7 @@ function render(){
       if(error&&/function|schema cache/i.test(error.message||""))({data,error}=await db.rpc("place_order",{...args,p_note:(args.p_note+" · شحن "+(shipMode==="sea"?"بحري":"جوي")).trim()}));
       if(error){$("err").textContent=error.message||"صار خطأ، جرّب مرة ثانية.";$("send").disabled=false;$("send").textContent="أرسل طلبي";return}
       const row=Array.isArray(data)?data[0]:data;codes.push(row.code);store.set("codes",codes);
+      if(preq&&cart.some(i=>i.req===preq.code)){preq=null;store.set("preq",null);calcStage="form"}
       cart=[];saveCart();await loadOrders();const placed=orders.find(o=>o.code===row.code);
       flash=placed&&placed.status==="accepted"?`تم تأكيد طلبك ✓ رقم الطلب ${row.id}. راح نتواصل وياك.`:`انرسل طلبك. رقم الطلب ${row.id}، ونرجعلك بالسعر قريباً.`;go("orders");
       // بعد ما ينحفظ بالنظام نفتح الواتساب برسالة جاهزة
@@ -315,7 +378,9 @@ async function boot(){
   if(s.data){settings=s.data;$("shopName").textContent=settings.shop_name;document.title=settings.shop_name}
   if(c.data)coupons=c.data;
   await loadOrders();render();
+  if(preq&&!preq.priced){checkPrice();startPoll()}
 }
+if(preq&&preq.code&&tab==="home")tab="calc";
 document.querySelector("nav.tabs").onclick=async e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.tab==="orders")await loadOrders();go(b.dataset.tab)};
 boot();
 </script>
