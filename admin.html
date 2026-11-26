@@ -111,8 +111,8 @@ function preqHTML(){if(!preqs.length)return"";
   return`<div class="card" style="border:2px solid var(--accent)"><h3>⚡ طلبات تسعير (${preqs.length})</h3><p class="hint">الزبون ينتظر بالصفحة. افتح السلة، اكتب المجموع وعدد القطع، والسعر يطلعله فوراً.</p>
   ${preqs.map(r=>`<div class="basket" style="display:grid;gap:8px"><span><b>#${r.id}</b> <span class="hint">${new Date(r.created_at).toLocaleTimeString("ar-IQ",{hour:"numeric",minute:"2-digit"})}${r.phone?` · <bdi class="ltr">${esc(r.phone)}</bdi>`:""}</span></span>
     <a class="btn sm ghost" href="${esc(r.link)}" target="_blank" rel="noopener">🛍️ افتح السلة بشي ان</a>
-    <div class="row"><div class="field"><label for="pa${r.id}">المجموع بعد الخصم</label><input id="pa${r.id}" type="number" step="0.01" inputmode="decimal"></div>
-      <div class="field" style="min-width:90px;max-width:120px"><label for="pcu${r.id}">العملة</label><select id="pcu${r.id}"><option value="USD"${qCur()==="USD"?" selected":""}>دولار</option><option value="AED"${qCur()==="AED"?" selected":""}>درهم</option></select></div>
+    <div class="row"><div class="field"><label for="pa${r.id}">مجموع السلة بالدولار $</label><input id="pa${r.id}" type="number" step="0.01" inputmode="decimal"></div>
+      
       <div class="field" style="max-width:110px"><label for="pp${r.id}">عدد القطع</label><input id="pp${r.id}" type="number" min="1" inputmode="numeric"></div></div>
     <p class="err" id="pe_r${r.id}"></p>
     <div class="row"><button class="btn" style="flex:2" type="button" data-setp="${r.id}">أرسل السعر للزبون</button><button class="btn ghost" style="flex:1" type="button" data-rejp="${r.id}">ما ينسعّر</button></div></div>`).join("")}</div>`}
@@ -313,9 +313,8 @@ function bind(){
     const sea=!!$("L"+id),cbm=cbmOf(id);if(sea&&!(cbm>0)){alert("اكتب الطول والعرض والارتفاع للشحنة البحرية.");return}
     const {error}=await db.rpc("quote_order",sea?{p_id:id,p_kg:0,p_sale_aed:Math.round(saleAED(id)*100)/100||null,p_cbm:cbm}:{p_id:id,p_kg:+$("k"+id).value||0,p_sale_aed:Math.round(saleAED(id)*100)/100||null});
     if(error){alert(error.message)}await load();view();});
-  A.querySelectorAll("[data-setp]").forEach(b=>b.onclick=async()=>{const id=+b.dataset.setp,er=$("pe_r"+id),v=+$("pa"+id).value||0,usd=$("pcu"+id).value==="USD",n=Math.round(+$("pp"+id).value||0);
+  A.querySelectorAll("[data-setp]").forEach(b=>b.onclick=async()=>{const id=+b.dataset.setp,er=$("pe_r"+id),v=+$("pa"+id).value||0,usd=true,n=Math.round(+$("pp"+id).value||0);
     if(!(v>0)||!(n>0)){er.textContent="اكتب المجموع وعدد القطع.";return}
-    try{localStorage.setItem("qcur",$("pcu"+id).value)}catch{}
     b.disabled=true;const {error}=await db.rpc("set_price",{p_id:id,p_total_aed:Math.round((usd?v*USD_AED:v)*100)/100,p_pieces:n});
     if(error){er.textContent=error.message;b.disabled=false;return}await load();view()});
   A.querySelectorAll("[data-rejp]").forEach(b=>b.onclick=async()=>{const note=prompt("سبب (يطلع للزبون، اختياري):","الرابط ما ينفتح، تأكد منه وأرسله مرة ثانية.");if(note===null)return;

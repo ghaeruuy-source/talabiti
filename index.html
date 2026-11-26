@@ -67,7 +67,7 @@ function estBox(e){return`<div class="quote">
   <div class="q"><span>التوصيل</span><span class="num">${iqd(e.del)}</span></div>
   <div class="q t"><span>${e.ship==null?"المجموع بدون الشحن":"السعر النهائي"}</span><span class="num">${iqd(e.total)}</span></div></div>
   ${e.saved>0?`<div class="saved">وفّرت ${iqd(e.saved)} بالكوبون</div>`:""}`}
-function readBox(R){return`<p class="sub">✓ قرينا سلتك: <b>${R.pieces}</b> قطعة، المجموع <b class="num">${R.total} ${R.currency==="USD"?"$":R.currency==="AED"?"درهم":R.currency}</b>. إذا الرقم غلط ارفع صورة أوضح.</p>${estBox(estimate(R.total_aed,R.pieces,shipMode))}`}
+function readBox(R){return`<p class="sub">✓ قرينا سلتك: <b>${R.pieces}</b> قطعة. إذا الرقم غلط ارفع صورة أوضح.</p>${estBox(estimate(R.total_aed,R.pieces,shipMode))}`}
 // نصغّر الصورة قبل لا نرفعها حتى تروح بسرعة
 function shrink(file){return new Promise((res,rej)=>{const img=new Image(),u=URL.createObjectURL(file);
   img.onload=()=>{const M=1568,k=Math.min(1,M/Math.max(img.width,img.height)),cv=document.createElement("canvas");cv.width=Math.round(img.width*k);cv.height=Math.round(img.height*k);
@@ -161,7 +161,6 @@ function render(){
     return;
   }
   if(tab==="calc"){
-    const cur=c=>c==="USD"?"$":c==="AED"?"درهم":c;
     if(calcStage==="loading"){
       el.innerHTML=`<div class="loader"><div class="orb">🚚</div><h3>دنحضّر التسعيرة</h3><p class="sub">تاخذ من ٥ لـ ١٥ ثانية عادةً.</p><div class="bar"><i></i></div>
         <div class="steps"><div class="s on" id="qs0"><span class="n">1</span>دنقرأ سلتك…</div><div class="s" id="qs1"><span class="n">2</span>دنحسب الشحن للعراق…</div><div class="s" id="qs2"><span class="n">3</span>دنحوّل الأسعار للدينار…</div></div></div>`;
@@ -206,7 +205,7 @@ function render(){
           <div class="q"><span>التوصيل</span><span class="num">${iqd(e.del)}</span></div></div>
         ${e.saved>0?`<div class="saved">وفّرت ${iqd(e.saved)} بالكوبون</div>`:""}
         ${dep>0?`<div class="dep"><span>🏷️ العربون المطلوب</span><span class="num">${iqd(dep)}</span></div>`:""}
-        <p class="sub" style="text-align:center">قرينا من صورتك: ${R.pieces} قطعة بمجموع ${R.total} ${cur(R.currency)}. إذا الرقم غلط ارجع وارفع صورة أوضح.</p>
+        <p class="sub" style="text-align:center">قرينا من صورتك: ${R.pieces} قطعة. إذا الرقم غلط ارجع وارفع صورة أوضح.</p>
         <button class="btn" type="button" id="qOrder">اطلبها هسه ←</button>
         <button class="btn ghost" type="button" id="qAgain">احسب سلة ثانية</button></div>`;
       $("qOrder").onclick=()=>{cart.push({link:calcData.link,name:`سلة شي ان كاملة (${R.pieces} قطعة)`,size:"—",qty:1,orig:R.total_aed,sale:R.total_aed,img:"",basket:true,count:R.pieces,read_id:R.read_id});
@@ -261,7 +260,7 @@ function render(){
       try{const image=await shrink(f);const {data,error}=await db.functions.invoke("cart-price",{body:{image}});res=error?null:data}catch{}
       draft.read=null;draft.readMsg="";
       if(res&&res.ok&&res.read_id){draft.read={read_id:res.read_id,total:res.total,currency:res.currency,pieces:res.pieces,total_aed:res.total_aed};draft.count=res.pieces}
-      else if(res&&res.ok){draft.count=res.pieces;draft.readMsg=`قريت: ${res.pieces} قطعة بمجموع ${res.total} ${res.currency==="USD"?"دولار":res.currency==="AED"?"درهم":res.currency}. حامد يأكدلك السعر النهائي.`}
+      else if(res&&res.ok){draft.count=res.pieces;draft.readMsg=`قريت: ${res.pieces} قطعة. حامد يأكدلك السعر النهائي.`}
       else draft.readMsg=res&&res.nokey?"اكتب عدد القطع، وحامد يسعّر سلتك ويرجعلك.":(res&&res.reason)||"ما كدرنا نقرا الصورة هسه. اكتب عدد القطع، وحامد يسعّر سلتك.";
       render()};
     $("mItem").onclick=()=>{keep();draft.cart=false;render()};
