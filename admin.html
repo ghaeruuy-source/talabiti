@@ -95,7 +95,7 @@ const qCur=()=>{try{return localStorage.getItem("qcur")==="IQD"?"IQD":"USD"}catc
 const toAED=(v,c)=>c==="IQD"?v/(+settings?.rate_aed||1):c==="USD"?v*USD_AED:v;
 const fromAED=(a,c)=>c==="IQD"?Math.round(a*(+settings?.rate_aed||0)):Math.round(a/USD_AED*100)/100;
 const saleAED=id=>{const v=+$("sa"+id).value||0,c=$("sc"+id)?$("sc"+id).value:"USD";return toAED(v,c)};
-const curPref=()=>{try{return localStorage.getItem("cur")==="USD"?"USD":"AED"}catch{return "AED"}};
+const curPref=()=>"USD";
 const rateShown=()=>{const r=+settings?.rate_aed||0;return curPref()==="USD"?Math.round(r*USD_AED):r};
 let adminEmail="";
 let q="",rp="month",rFrom="",rTo="",stmtPhone="";
@@ -169,7 +169,7 @@ function view(){
       <button class="btn" type="button" id="addC">أضف الكوبون</button></div>
     <div class="card"><h3>الأسعار</h3>
       <div class="row">
-        <div class="field"><label for="sCur">سعر الصرف حسب</label><select id="sCur"><option value="AED"${curPref()==="AED"?" selected":""}>الدرهم</option><option value="USD"${curPref()==="USD"?" selected":""}>الدولار</option></select></div>
+        <input id="sCur" type="hidden" value="USD">
         <div class="field"><label for="sRate" id="sRateL">${curPref()==="USD"?"الدولار بكم دينار؟":"الدرهم بكم دينار؟"}</label><input id="sRate" type="text" inputmode="decimal" data-num inputmode="decimal" step="any" value="${rateShown()}"></div>
         <div class="field"><label for="sComm">ربحك (عمولة ٪)</label><input id="sComm" type="text" inputmode="decimal" data-num value="${+settings?.commission_pct}"></div></div>
       <div class="row">
@@ -181,7 +181,7 @@ function view(){
       <div class="field"><label for="sName">اسم الصفحة</label><input id="sName" value="${esc(settings?.shop_name)}"></div>
       <div class="field"><label for="sWa">رقم الواتساب</label><input id="sWa" class="ltr" value="${esc(settings?.whatsapp)}"></div>
       <div class="field"><label for="sUrl">رابط شي ان</label><input id="sUrl" class="ltr" value="${esc(settings?.shein_url)}"></div>
-      <p class="hint">الأسعار بشي ان الإمارات بالدرهم. إذا اخترت الدولار، الموقع يحوله للدرهم بالسعر الثابت (١ دولار = ٣.٦٧٢٥ درهم) وبعدها للدينار.</p><p class="sub" id="sMsg"></p>
+      <p class="hint">اكتب سعر الدولار بالدينار (مثلاً 1520). التسعير بالدولار يتحول للدينار على هذا السعر، والتسعير بالدينار ما يحتاج تحويل.</p><p class="sub" id="sMsg"></p>
       <button class="btn" type="button" id="saveS">احفظ</button></div>
     <div class="card"><h3>🔔 إشعار واتساب</h3>
       <p class="hint">${waStatus?`✓ مفعّل: يوصل إشعار على <b class="ltr">+${esc(waStatus)}</b> بكل طلب تسعير وكل طلب جديد.`:"يوصلك إشعار واتساب بكل طلب تسعير وكل طلب جديد. للتفعيل (مرة وحدة):"}</p>
